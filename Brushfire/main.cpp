@@ -78,7 +78,6 @@ void raise(std::list<int>& queue, int* dist, int* obst, bool* toRaise, int s) {
 			if (!isOcc(obst, obst[n])) {
 				clearCell(dist, obst, n);
 				toRaise[n] = true;
-				//queue.push_back(n);
 			}
 			queue.push_back(n);
 		}
