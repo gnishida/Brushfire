@@ -16,15 +16,16 @@
 #include <time.h>
 
 #define CELL_LENGTH 100
-#define CITY_SIZE 20 //200
-#define GPU_BLOCK_SIZE 20 //40
-#define GPU_NUM_THREADS 1 //96
+#define CITY_SIZE 15 //200
+#define GPU_BLOCK_SIZE 8 //40
+#define GPU_NUM_THREADS 8 //96
 #define GPU_BLOCK_SCALE (1.0)
 #define NUM_FEATURES 1//5
-#define QUEUE_MAX 1999
+#define QUEUE_MAX 3999
 #define MAX_DIST 99
 #define BF_CLEARED -1
 #define QUEUE_EMPTY -1
+#define MAX_ITERATIONS 1
 
 #define CUDA_CALL(x) {if((x) != cudaSuccess){ \
   printf("CUDA error at %s:%d\n",__FILE__,__LINE__); \
@@ -238,7 +239,25 @@ void removeObst(int* queue, unsigned int* queue_end, int* dist, int* obst, bool*
  */
 __global__
 void computeDistMap(ZoningPlan* zoningPlan, int* dist, int* obst, bool* toRaise, int* queue, unsigned int* queue_begin, unsigned int* queue_end) {
-	// 初期化する
+	int featureId = 0;
+
+	while (true) {
+		int queue_index = atomicInc(queue_begin, QUEUE_MAX);
+		int s = queue[queue_index];
+		if (s == QUEUE_EMPTY) break;
+
+		//queue[queue_index] = QUEUE_EMPTY;
+
+		if (toRaise[s * NUM_FEATURES + featureId]) {
+			raise(queue, queue_end, dist, obst, toRaise, s, featureId);
+		} else if (isOcc(obst, obst[s * NUM_FEATURES + featureId], featureId)) {
+			lower(queue, queue_end, dist, obst, toRaise, s, featureId);
+		}
+	}
+}
+
+__global__
+void initObst(ZoningPlan* zoningPlan, int* dist, int* obst, bool* toRaise, int* queue, unsigned int* queue_begin, unsigned int* queue_end) {
 	for (int r = 0; r < CITY_SIZE; ++r) {
 		for (int c = 0; c < CITY_SIZE; ++c) {
 			for (int k = 0; k < NUM_FEATURES; ++k) {
@@ -251,22 +270,6 @@ void computeDistMap(ZoningPlan* zoningPlan, int* dist, int* obst, bool* toRaise,
 		}
 	}
 
-
-	int featureId = 0;
-
-	while (true) {
-		int queue_index = atomicInc(queue_begin, QUEUE_MAX);
-		int s = queue[queue_index];
-		if (s == QUEUE_EMPTY) break;
-
-		queue[queue_index] = QUEUE_EMPTY;
-
-		if (toRaise[s * NUM_FEATURES + featureId]) {
-			raise(queue, queue_end, dist, obst, toRaise, s, featureId);
-		} else if (isOcc(obst, obst[s * NUM_FEATURES + featureId], featureId)) {
-			lower(queue, queue_end, dist, obst, toRaise, s, featureId);
-		}
-	}
 }
 
 __global__
@@ -386,60 +389,6 @@ void acceptProposal(ZoningPlan* zoningPlan, float* score, float* proposalScore, 
 }
 
 /**
- * 直近の店までの距離を計算する（CPU版）
- */
-__host__
-void computeDistanceToStoreCPU(ZoningPlan* zoningPLan, DistanceMap* distanceMap) {
-	std::list<int3> queue;
-
-	for (int feature_id = 0; feature_id < NUM_FEATURES; ++feature_id) {
-		for (int cell_id = 0; cell_id < CITY_SIZE * CITY_SIZE; ++cell_id) {
-			int r = cell_id / CITY_SIZE;
-			int c = cell_id % CITY_SIZE;
-
-			if (zoningPLan->zones[r][c].type - 1 == feature_id) {
-				queue.push_back(make_int3(c, r, feature_id));
-				distanceMap->distances[r][c][feature_id] = 0;
-			} else {
-				distanceMap->distances[r][c][feature_id] = MAX_DIST;
-			}
-		}
-	}
-
-	while (!queue.empty()) {
-		int3 pt = queue.front();
-		queue.pop_front();
-
-		int d = distanceMap->distances[pt.y][pt.x][pt.z];
-
-		if (pt.y > 0) {
-			if (distanceMap->distances[pt.y-1][pt.x][pt.z] > d + 1) {
-				distanceMap->distances[pt.y-1][pt.x][pt.z] = d + 1;
-				queue.push_back(make_int3(pt.x, pt.y-1, pt.z));
-			}
-		}
-		if (pt.y < CITY_SIZE - 1) {
-			if (distanceMap->distances[pt.y+1][pt.x][pt.z] > d + 1) {
-				distanceMap->distances[pt.y+1][pt.x][pt.z] = d + 1;
-				queue.push_back(make_int3(pt.x, pt.y+1, pt.z));
-			}
-		}
-		if (pt.x > 0) {
-			if (distanceMap->distances[pt.y][pt.x-1][pt.z] > d + 1) {
-				distanceMap->distances[pt.y][pt.x-1][pt.z] = d + 1;
-				queue.push_back(make_int3(pt.x-1, pt.y, pt.z));
-			}
-		}
-		if (pt.x < CITY_SIZE - 1) {
-			if (distanceMap->distances[pt.y][pt.x+1][pt.z] > d + 1) {
-				distanceMap->distances[pt.y][pt.x+1][pt.z] = d + 1;
-				queue.push_back(make_int3(pt.x+1, pt.y, pt.z));
-			}
-		}
-	}
-}
-
-/**
  * デバッグ用に、スコアを表示する。
  */
 __host__
@@ -460,7 +409,7 @@ void showDevZoningPlan(ZoningPlan* zoningPlan) {
 	printf("<<< Zone Map >>>\n");
 	for (int r = CITY_SIZE - 1; r >= 0; --r) {
 		for (int c = 0; c < CITY_SIZE; ++c) {
-			printf("%d, ", plan.zones[r][c].type);
+			printf("%2d,", plan.zones[r][c].type);
 		}
 		printf("\n");
 	}
@@ -479,13 +428,41 @@ void showDevDistMap(int* dist, int feature_id) {
 	printf("<<< Distance Map >>>\n");
 	for (int r = CITY_SIZE - 1; r >= 0; --r) {
 		for (int c = 0; c < CITY_SIZE; ++c) {
-			printf("%d, ", hostDist[(r * CITY_SIZE + c) * NUM_FEATURES + feature_id]);
+			printf("%2d,", hostDist[(r * CITY_SIZE + c) * NUM_FEATURES + feature_id]);
 		}
 		printf("\n");
 	}
 	printf("\n");
 
 	free(hostDist);
+}
+
+/**
+ * キューの内容を表示する。
+ *
+ * queueEndは、次の要素を格納する位置を示す。つまり、queueEndの１つ手前までが、有効なキューの値ということだ。
+ */
+__host__
+void showDevQueue(int* devQueue, unsigned int* devQueueEnd) {
+	int* queue;
+	int queueEnd;
+
+	queue = (int*)malloc(sizeof(int) * (QUEUE_MAX + 1));
+	CUDA_CALL(cudaMemcpy(queue, devQueue, sizeof(int) * (QUEUE_MAX + 1), cudaMemcpyDeviceToHost));
+	CUDA_CALL(cudaMemcpy(&queueEnd, devQueueEnd, sizeof(int), cudaMemcpyDeviceToHost));
+	printf("<<< Queue >>>\n");
+	for (int i = 0; i < queueEnd; ++i) {
+		if (queue[i] >= 0) {
+			int x = queue[i] % CITY_SIZE;
+			int y = queue[i] / CITY_SIZE;
+			printf("%2d,%2d\n", x, y);
+		} else {
+			printf("--,--\n");
+		}
+	}
+	printf("\n");
+
+	free(queue);
 }
 
 __host__
@@ -664,11 +641,15 @@ int main()
 	CUDA_CALL(cudaMemcpy(devQueueBegin, &hostQueueBegin, sizeof(unsigned int), cudaMemcpyHostToDevice));
 	CUDA_CALL(cudaMemcpy(devQueueEnd, &hostQueueEnd, sizeof(unsigned int), cudaMemcpyHostToDevice));
 
-
+	// 初期化
+	initObst<<<1, 1>>>(devZoningPlan, devDist, devObst, devToRaise, devQueue, devQueueBegin, devQueueEnd);
 	computeDistMap<<<dim3(CITY_SIZE / GPU_BLOCK_SIZE, CITY_SIZE / GPU_BLOCK_SIZE), GPU_NUM_THREADS>>>(devZoningPlan, devDist, devObst, devToRaise, devQueue, devQueueBegin, devQueueEnd);
+
 	showDevDistMap(devDist, 0);
 
-	for (int iter = 0; iter < 100; ++iter) {
+	check(devZoningPlan, devDist);
+
+	for (int iter = 0; iter < MAX_ITERATIONS; ++iter) {
 		// キューを初期化
 		CUDA_CALL(cudaMemset(devQueue, BF_CLEARED, sizeof(int) * (QUEUE_MAX + 1)));
 		CUDA_CALL(cudaMemset(devQueueBegin, 0, sizeof(unsigned int)));
@@ -676,12 +657,14 @@ int main()
 
 		// 店を１つ移動する
 		moveObst<<<1, 1>>>(devZoningPlan, devDist, devObst, devToRaise, devQueue, devQueueBegin, devQueueEnd, devRand);
-		//showDevZoningPlan(devZoningPlan);
 		computeDistMap<<<dim3(CITY_SIZE / GPU_BLOCK_SIZE, CITY_SIZE / GPU_BLOCK_SIZE), GPU_NUM_THREADS>>>(devZoningPlan, devDist, devObst, devToRaise, devQueue, devQueueBegin, devQueueEnd);
-		//showDevDistMap(devDist, 0);
-		//check(devZoningPlan, devDist);
+
+		if (check(devZoningPlan, devDist) > 0) break;
 	}
 
+	showDevZoningPlan(devZoningPlan);
+	showDevDistMap(devDist, 0);
+	showDevQueue(devQueue, devQueueEnd);
 
 	// release device buffer
 	cudaFree(devZoningPlan);
