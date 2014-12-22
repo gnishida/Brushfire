@@ -16,8 +16,8 @@
 #include <time.h>
 
 #define CELL_LENGTH 100
-#define CITY_SIZE 5 //200
-#define GPU_BLOCK_SIZE 5 //40
+#define CITY_SIZE 20 //200
+#define GPU_BLOCK_SIZE 20 //40
 #define GPU_NUM_THREADS 1 //96
 #define GPU_BLOCK_SCALE (1.0)
 #define NUM_FEATURES 1//5
@@ -143,7 +143,7 @@ bool isOcc(int* obst, int pos, int featureId) {
 	return obst[pos * NUM_FEATURES + featureId] == pos;
 }
 
-__device__
+__device__ __host__
 int distance(int pos1, int pos2) {
 	int x1 = pos1 % CITY_SIZE;
 	int y1 = pos1 / CITY_SIZE;
@@ -269,6 +269,34 @@ void computeDistMap(ZoningPlan* zoningPlan, int* dist, int* obst, bool* toRaise,
 	}
 }
 
+__global__
+void moveObst(ZoningPlan* zoningPlan, int* dist, int* obst, bool* toRaise, int* queue, unsigned int* queue_begin, unsigned int* queue_end, unsigned int* randx) {
+	int s1;
+	while (true) {
+		s1 = randf(randx, 0, CITY_SIZE * CITY_SIZE);
+		int x = s1 % CITY_SIZE;
+		int y = s1 / CITY_SIZE;
+		if (zoningPlan->zones[y][x].type == 1) {
+			zoningPlan->zones[y][x].type = 0;
+			break;
+		}
+	}
+
+	int s2;
+	while (true) {
+		s2 = randf(randx, 0, CITY_SIZE * CITY_SIZE);
+		int x = s2 % CITY_SIZE;
+		int y = s2 / CITY_SIZE;
+		if (zoningPlan->zones[y][x].type == 0) {
+			zoningPlan->zones[y][x].type = 1;
+			break;
+		}
+	}
+
+	setObst(queue, queue_end, dist, obst, toRaise, s2, 0);
+	removeObst(queue, queue_end, dist, obst, toRaise, s1, 0);
+}
+
 __device__
 float min3(int distToStore, int distToAmusement, int distToFactory) {
 	return min(min(distToStore, distToAmusement), distToFactory);
@@ -336,11 +364,11 @@ void computeScore(ZoningPlan* zoningPlan, DistanceMap* distanceMap, float* devSc
 		devScores[(r0 + r1) * CITY_SIZE + c0 + c1] = tmpScore;
 	}
 
-	atomicAdd(&sScore, lScore);
+	//atomicAdd(&sScore, lScore);
 
 	__syncthreads();
 
-	atomicAdd(devScore, sScore);
+	//atomicAdd(devScore, sScore);
 }
 
 __global__
@@ -458,6 +486,50 @@ void showDevDistMap(int* dist, int feature_id) {
 	printf("\n");
 
 	free(hostDist);
+}
+
+__host__
+int check(ZoningPlan* devZone, int* devDist) {
+	ZoningPlan zone;
+	int* dist;
+	dist = (int*)malloc(sizeof(int) * CITY_SIZE * CITY_SIZE * NUM_FEATURES);
+
+	CUDA_CALL(cudaMemcpy(&zone, devZone, sizeof(ZoningPlan), cudaMemcpyDeviceToHost));
+	CUDA_CALL(cudaMemcpy(dist, devDist, sizeof(DistanceMap), cudaMemcpyDeviceToHost));
+
+	int count = 0;
+
+	for (int r = 0; r < CITY_SIZE; ++r) {
+		for (int c = 0; c < CITY_SIZE; ++c) {
+			for (int k = 0; k < NUM_FEATURES; ++k) {
+				int min_dist = MAX_DIST;
+				for (int r2 = 0; r2 < CITY_SIZE; ++r2) {
+					for (int c2 = 0; c2 < CITY_SIZE; ++c2) {
+						if (zone.zones[r2][c2].type == 0) continue;
+
+						if (zone.zones[r2][c2].type - 1 == k) {
+							int d = distance(r2 * CITY_SIZE + c2, r * CITY_SIZE + c);
+							if (d < min_dist) {
+								min_dist = d;
+							}
+						}
+					}
+				}
+
+				if (dist[r * CITY_SIZE + c] != min_dist) {
+					count++;
+				}
+			}
+		}
+	}
+	
+	if (count > 0) {
+		printf("Check results: #error cells = %d\n", count);
+	}
+
+	free(dist);
+
+	return count;
 }
 
 int main()
@@ -596,10 +668,19 @@ int main()
 	computeDistMap<<<dim3(CITY_SIZE / GPU_BLOCK_SIZE, CITY_SIZE / GPU_BLOCK_SIZE), GPU_NUM_THREADS>>>(devZoningPlan, devDist, devObst, devToRaise, devQueue, devQueueBegin, devQueueEnd);
 	showDevDistMap(devDist, 0);
 
-	
+	for (int iter = 0; iter < 100; ++iter) {
+		// キューを初期化
+		CUDA_CALL(cudaMemset(devQueue, BF_CLEARED, sizeof(int) * (QUEUE_MAX + 1)));
+		CUDA_CALL(cudaMemset(devQueueBegin, 0, sizeof(unsigned int)));
+		CUDA_CALL(cudaMemset(devQueueEnd, 0, sizeof(unsigned int)));
 
-
-
+		// 店を１つ移動する
+		moveObst<<<1, 1>>>(devZoningPlan, devDist, devObst, devToRaise, devQueue, devQueueBegin, devQueueEnd, devRand);
+		//showDevZoningPlan(devZoningPlan);
+		computeDistMap<<<dim3(CITY_SIZE / GPU_BLOCK_SIZE, CITY_SIZE / GPU_BLOCK_SIZE), GPU_NUM_THREADS>>>(devZoningPlan, devDist, devObst, devToRaise, devQueue, devQueueBegin, devQueueEnd);
+		//showDevDistMap(devDist, 0);
+		//check(devZoningPlan, devDist);
+	}
 
 
 	// release device buffer

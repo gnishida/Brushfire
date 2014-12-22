@@ -75,8 +75,7 @@
       </Command>
     </PostBuildEvent>
     <CudaCompile>
-      <CodeGeneration>
-      </CodeGeneration>
+      <CodeGeneration>compute_11,sm_11;%(CodeGeneration)</CodeGeneration>
       <Include>
       </Include>
       <Runtime>MTd</Runtime>
