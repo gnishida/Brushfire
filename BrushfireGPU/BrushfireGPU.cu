@@ -247,10 +247,10 @@ void computeDistMap(ZoningPlan* zoningPlan, int* dist, int* obst, bool* toRaise,
 	__syncthreads();
 
 	while (true) {
-		//do {} while (atomicCAS(&lock, 0, 1));
-		if (queue[*queue_begin] == BF_CLEARED) break;
+		do {} while (atomicCAS(&lock, 0, 1));
+		if (queue[*queue_begin] == QUEUE_EMPTY) break;
 		int queue_index = *queue_begin;
-		*queue_begin++;
+		(*queue_begin)++;
 		lock = 0;
 		//int queue_index = atomicInc(queue_begin, QUEUE_MAX);
 
