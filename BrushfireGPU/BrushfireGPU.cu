@@ -16,16 +16,16 @@
 #include <time.h>
 
 #define CELL_LENGTH 100
-#define CITY_SIZE 8 //200
-#define GPU_BLOCK_SIZE 8 //40
-#define GPU_NUM_THREADS 8 //96
+#define CITY_SIZE 200 //200
+#define GPU_BLOCK_SIZE 200 //40
+#define GPU_NUM_THREADS 32 //96
 #define GPU_BLOCK_SCALE (1.0)
 #define NUM_FEATURES 1//5
 #define QUEUE_MAX 3999
 #define MAX_DIST 99
 #define BF_CLEARED -1
 #define QUEUE_EMPTY -1
-#define MAX_ITERATIONS 1
+#define MAX_ITERATIONS 1000
 
 #define CUDA_CALL(x) {if((x) != cudaSuccess){ \
   printf("CUDA error at %s:%d\n",__FILE__,__LINE__); \
@@ -255,7 +255,7 @@ void computeDistMap(ZoningPlan* zoningPlan, int* dist, int* obst, bool* toRaise,
 		//int queue_index = atomicInc(queue_begin, QUEUE_MAX);
 
 		int s = queue[queue_index];
-		queue[queue_index] = QUEUE_EMPTY;
+		//queue[queue_index] = QUEUE_EMPTY;
 
 		if (toRaise[s * NUM_FEATURES + featureId]) {
 			raise(queue, queue_end, dist, obst, toRaise, s, featureId);
@@ -271,6 +271,7 @@ void initObst(ZoningPlan* zoningPlan, int* dist, int* obst, bool* toRaise, int* 
 		for (int c = 0; c < CITY_SIZE; ++c) {
 			for (int k = 0; k < NUM_FEATURES; ++k) {
 				clearCell(dist, obst, r * CITY_SIZE + c, k);
+				toRaise[r * CITY_SIZE + c] = false;
 
 				if (zoningPlan->zones[r][c].type > 0) {
 					setObst(queue, queue_end, dist, obst, toRaise, r * CITY_SIZE + c, zoningPlan->zones[r][c].type - 1);
@@ -288,10 +289,7 @@ void moveObst(ZoningPlan* zoningPlan, int* dist, int* obst, bool* toRaise, int* 
 		s1 = randf(randx, 0, CITY_SIZE * CITY_SIZE);
 		int x = s1 % CITY_SIZE;
 		int y = s1 / CITY_SIZE;
-		if (zoningPlan->zones[y][x].type == 1) {
-			zoningPlan->zones[y][x].type = 0;
-			break;
-		}
+		if (zoningPlan->zones[y][x].type == 1) break;
 	}
 
 	int s2;
@@ -299,14 +297,17 @@ void moveObst(ZoningPlan* zoningPlan, int* dist, int* obst, bool* toRaise, int* 
 		s2 = randf(randx, 0, CITY_SIZE * CITY_SIZE);
 		int x = s2 % CITY_SIZE;
 		int y = s2 / CITY_SIZE;
-		if (zoningPlan->zones[y][x].type == 0) {
-			zoningPlan->zones[y][x].type = 1;
-			break;
-		}
+		if (zoningPlan->zones[y][x].type == 0) break;
 	}
 
 	setObst(queue, queue_end, dist, obst, toRaise, s2, 0);
 	removeObst(queue, queue_end, dist, obst, toRaise, s1, 0);
+	int x1 = s1 % CITY_SIZE;
+	int y1 = s1 / CITY_SIZE;
+	zoningPlan->zones[y1][x1].type = 0;
+	int x2 = s2 % CITY_SIZE;
+	int y2 = s2 / CITY_SIZE;
+	zoningPlan->zones[y2][x2].type = 1;
 }
 
 __device__
@@ -416,7 +417,7 @@ void showDevZoningPlan(ZoningPlan* zoningPlan) {
 
 	CUDA_CALL(cudaMemcpy(&plan, zoningPlan, sizeof(ZoningPlan), cudaMemcpyDeviceToHost));
 	printf("<<< Zone Map >>>\n");
-	for (int r = CITY_SIZE - 1; r >= 0; --r) {
+	for (int r = 0; r < CITY_SIZE; ++r) {
 		for (int c = 0; c < CITY_SIZE; ++c) {
 			printf("%2d,", plan.zones[r][c].type);
 		}
@@ -435,7 +436,7 @@ void showDevDistMap(int* dist, int feature_id) {
 	hostDist = (int*)malloc(sizeof(int) * CITY_SIZE * CITY_SIZE * NUM_FEATURES);
 	CUDA_CALL(cudaMemcpy(hostDist, dist, sizeof(DistanceMap), cudaMemcpyDeviceToHost));
 	printf("<<< Distance Map >>>\n");
-	for (int r = CITY_SIZE - 1; r >= 0; --r) {
+	for (int r = 0; r < CITY_SIZE; ++r) {
 		for (int c = 0; c < CITY_SIZE; ++c) {
 			printf("%2d,", hostDist[(r * CITY_SIZE + c) * NUM_FEATURES + feature_id]);
 		}
@@ -444,6 +445,27 @@ void showDevDistMap(int* dist, int feature_id) {
 	printf("\n");
 
 	free(hostDist);
+}
+
+/**
+ * デバッグ用に、obstマップを表示する。
+ */
+__host__
+void showDevObst(int* obst, int feature_id) {
+	int* hostObst;
+
+	hostObst = (int*)malloc(sizeof(int) * CITY_SIZE * CITY_SIZE * NUM_FEATURES);
+	CUDA_CALL(cudaMemcpy(hostObst, obst, sizeof(int) * CITY_SIZE * CITY_SIZE * NUM_FEATURES, cudaMemcpyDeviceToHost));
+	printf("<<< Obst Map >>>\n");
+	for (int r = 0; r < CITY_SIZE; ++r) {
+		for (int c = 0; c < CITY_SIZE; ++c) {
+			printf("%2d,", hostObst[(r * CITY_SIZE + c) * NUM_FEATURES + feature_id]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+
+	free(hostObst);
 }
 
 /**
@@ -504,6 +526,7 @@ int check(ZoningPlan* devZone, int* devDist) {
 
 				if (dist[r * CITY_SIZE + c] != min_dist) {
 					count++;
+					printf("%d, %d\n", c, r);
 				}
 			}
 		}
@@ -677,7 +700,9 @@ int main()
 
 	showDevZoningPlan(devZoningPlan);
 	showDevDistMap(devDist, 0);
-	showDevQueue(devQueue, devQueueEnd);
+	//showDevObst(devObst, 0);
+
+	//showDevQueue(devQueue, devQueueEnd);
 
 	// release device buffer
 	cudaFree(devZoningPlan);
