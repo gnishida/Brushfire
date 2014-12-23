@@ -16,11 +16,11 @@
 #include <time.h>
 
 #define CELL_LENGTH 200
-#define CITY_SIZE 20 //200
-#define GPU_BLOCK_SIZE 20 //40
-#define GPU_NUM_THREADS 1 //96
+#define CITY_SIZE 5 //200
+#define GPU_BLOCK_SIZE 5 //40
+#define GPU_NUM_THREADS 2 //96
 #define GPU_BLOCK_SCALE (1.0)
-#define NUM_FEATURES 5 //5
+#define NUM_FEATURES 1 //5
 #define QUEUE_MAX 4999
 #define MAX_DIST 99
 #define BF_CLEARED -1
@@ -238,11 +238,14 @@ void computeDistMap(ZoningPlan* zoningPlan, int* dist, int* obst, bool* toRaise,
 	__shared__ int lock;
 	lock = 0;
 
-	__syncthreads();
+	//__syncthreads();
 
 	while (true) {
 		do {} while (atomicCAS(&lock, 0, 1));
-		if (queue[*queue_begin].x == QUEUE_EMPTY) break;
+		if (queue[*queue_begin].x == QUEUE_EMPTY) {
+			lock = 0;
+			break;
+		}
 		int queue_index = *queue_begin;
 		(*queue_begin)++;
 		if (*queue_begin > QUEUE_MAX) *queue_begin = 0;
@@ -519,7 +522,7 @@ int main()
 
 	for (int iter = 0; iter < MAX_ITERATIONS; ++iter) {
 		// キューを初期化
-		CUDA_CALL(cudaMemset(devQueue, QUEUE_EMPTY, sizeof(int) * (QUEUE_MAX + 1)));
+		CUDA_CALL(cudaMemset(devQueue, QUEUE_EMPTY, sizeof(int2) * (QUEUE_MAX + 1)));
 		CUDA_CALL(cudaMemset(devQueueBegin, 0, sizeof(unsigned int)));
 		CUDA_CALL(cudaMemset(devQueueEnd, 0, sizeof(unsigned int)));
 
