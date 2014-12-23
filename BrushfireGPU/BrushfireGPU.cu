@@ -16,7 +16,7 @@
 #include <time.h>
 
 #define CELL_LENGTH 100
-#define CITY_SIZE 15 //200
+#define CITY_SIZE 8 //200
 #define GPU_BLOCK_SIZE 8 //40
 #define GPU_NUM_THREADS 8 //96
 #define GPU_BLOCK_SCALE (1.0)
@@ -246,7 +246,7 @@ void computeDistMap(ZoningPlan* zoningPlan, int* dist, int* obst, bool* toRaise,
 		int s = queue[queue_index];
 		if (s == QUEUE_EMPTY) break;
 
-		//queue[queue_index] = QUEUE_EMPTY;
+		queue[queue_index] = QUEUE_EMPTY;
 
 		if (toRaise[s * NUM_FEATURES + featureId]) {
 			raise(queue, queue_end, dist, obst, toRaise, s, featureId);
