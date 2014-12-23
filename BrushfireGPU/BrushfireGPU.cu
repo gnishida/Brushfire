@@ -241,11 +241,20 @@ __global__
 void computeDistMap(ZoningPlan* zoningPlan, int* dist, int* obst, bool* toRaise, int* queue, unsigned int* queue_begin, unsigned int* queue_end) {
 	int featureId = 0;
 
-	while (true) {
-		int queue_index = atomicInc(queue_begin, QUEUE_MAX);
-		int s = queue[queue_index];
-		if (s == QUEUE_EMPTY) break;
+	__shared__ int lock;
+	lock = 0;
 
+	__syncthreads();
+
+	while (true) {
+		//do {} while (atomicCAS(&lock, 0, 1));
+		if (queue[*queue_begin] == BF_CLEARED) break;
+		int queue_index = *queue_begin;
+		*queue_begin++;
+		lock = 0;
+		//int queue_index = atomicInc(queue_begin, QUEUE_MAX);
+
+		int s = queue[queue_index];
 		queue[queue_index] = QUEUE_EMPTY;
 
 		if (toRaise[s * NUM_FEATURES + featureId]) {
@@ -643,7 +652,9 @@ int main()
 
 	// 初期化
 	initObst<<<1, 1>>>(devZoningPlan, devDist, devObst, devToRaise, devQueue, devQueueBegin, devQueueEnd);
+	cudaThreadSynchronize();
 	computeDistMap<<<dim3(CITY_SIZE / GPU_BLOCK_SIZE, CITY_SIZE / GPU_BLOCK_SIZE), GPU_NUM_THREADS>>>(devZoningPlan, devDist, devObst, devToRaise, devQueue, devQueueBegin, devQueueEnd);
+	cudaThreadSynchronize();
 
 	showDevDistMap(devDist, 0);
 
@@ -657,7 +668,9 @@ int main()
 
 		// 店を１つ移動する
 		moveObst<<<1, 1>>>(devZoningPlan, devDist, devObst, devToRaise, devQueue, devQueueBegin, devQueueEnd, devRand);
+		cudaThreadSynchronize();
 		computeDistMap<<<dim3(CITY_SIZE / GPU_BLOCK_SIZE, CITY_SIZE / GPU_BLOCK_SIZE), GPU_NUM_THREADS>>>(devZoningPlan, devDist, devObst, devToRaise, devQueue, devQueueBegin, devQueueEnd);
+		cudaThreadSynchronize();
 
 		if (check(devZoningPlan, devDist) > 0) break;
 	}
