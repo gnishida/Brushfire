@@ -251,11 +251,12 @@ void computeDistMap(ZoningPlan* zoningPlan, int* dist, int* obst, bool* toRaise,
 		if (queue[*queue_begin] == QUEUE_EMPTY) break;
 		int queue_index = *queue_begin;
 		(*queue_begin)++;
+		if (*queue_begin > QUEUE_MAX) *queue_begin = 0;
 		lock = 0;
 		//int queue_index = atomicInc(queue_begin, QUEUE_MAX);
 
 		int s = queue[queue_index];
-		//queue[queue_index] = QUEUE_EMPTY;
+		queue[queue_index] = QUEUE_EMPTY;
 
 		if (toRaise[s * NUM_FEATURES + featureId]) {
 			raise(queue, queue_end, dist, obst, toRaise, s, featureId);
