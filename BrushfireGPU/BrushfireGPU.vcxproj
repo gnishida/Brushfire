@@ -104,7 +104,8 @@
       </Command>
     </PostBuildEvent>
     <CudaCompile>
-      <CodeGeneration>compute_11,sm_11;compute_20,sm_20;compute_30,sm_30</CodeGeneration>
+      <CodeGeneration>
+      </CodeGeneration>
       <Runtime>MT</Runtime>
     </CudaCompile>
   </ItemDefinitionGroup>
