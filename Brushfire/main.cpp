@@ -3,10 +3,8 @@
 #include <time.h>
 
 #define CITY_SIZE 200
-#define BF_MAX_DIST 99
+#define MAX_DIST 99
 #define BF_CLEARED -1
-#define BF_TYPE_RAISE 0
-#define BF_TYPE_LOWER 1
 #define MAX_ITERATIONS 1000
 #define NUM_FEATURES 5
 
@@ -99,7 +97,7 @@ inline int distance(int pos1, int pos2) {
 }
 
 void clearCell(int* dist, int* obst, int s, int featureId) {
-	dist[s * NUM_FEATURES + featureId] = BF_MAX_DIST;
+	dist[s * NUM_FEATURES + featureId] = MAX_DIST;
 	obst[s * NUM_FEATURES + featureId] = BF_CLEARED;
 }
 
@@ -192,7 +190,7 @@ int check(int* zone, int* dist) {
 	for (int r = 0; r < CITY_SIZE; ++r) {
 		for (int c = 0; c < CITY_SIZE; ++c) {
 			for (int k = 0; k < NUM_FEATURES; ++k) {
-				int min_dist = BF_MAX_DIST;
+				int min_dist = MAX_DIST;
 				for (int r2 = 0; r2 < CITY_SIZE; ++r2) {
 					for (int c2 = 0; c2 < CITY_SIZE; ++c2) {
 						if (zone[r2 * CITY_SIZE + c2] - 1 == k) {
@@ -276,7 +274,7 @@ int main() {
 			if (zone[i] - 1 == k) {
 				setStore(queue, zone, dist, obst, toRaise, i, k);
 			} else {
-				dist[i * NUM_FEATURES + k] = BF_MAX_DIST;
+				dist[i * NUM_FEATURES + k] = MAX_DIST;
 				obst[i * NUM_FEATURES + k] = BF_CLEARED;
 			}
 		}
@@ -290,8 +288,6 @@ int main() {
 	
 	bf_count = 0;
 	for (int iter = 0; iter < MAX_ITERATIONS; ++iter) {
-		printf("iter = %d\n", iter);
-
 		queue.clear();
 
 		// ２つのセルのゾーンタイプを交換
