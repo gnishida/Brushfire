@@ -1,4 +1,15 @@
-﻿#include <list>
+﻿/**
+ * Brushfireアルゴリズムを使って、距離マップを計算する。
+ * 住宅ゾーンに加えて、５種類のゾーンタイプがあり、各セルについて、直近の各種類のゾーンまでの距離を計算する。
+ * GPU版も実装していたが、キューの実装においてcritical sectionが必要であるものの、CUDAでは実装できないことが判明。
+ * CPU版で十分速いので、CPU版で良しとしよう。
+ *
+ * @author Gen Nishida
+ * @date 12/24/2014
+ * @version 1.0
+ */
+
+#include <list>
 #include <vector>
 #include <time.h>
 
