@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BrushfireGPU", "BrushfireGP
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MCMCGPU", "MCMCGPU\MCMCGPU.vcxproj", "{524A1CD8-CFB5-468C-A202-6AFDE8E5D18B}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MCMC", "MCMC\MCMC.vcxproj", "{C6206E87-4F82-4787-9385-5AFC05D9BDC5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -16,13 +18,14 @@ Global
 		{9AC2DE9A-C222-43A7-B184-30190711D421}.Debug|Win32.ActiveCfg = Debug|Win32
 		{9AC2DE9A-C222-43A7-B184-30190711D421}.Debug|Win32.Build.0 = Debug|Win32
 		{9AC2DE9A-C222-43A7-B184-30190711D421}.Release|Win32.ActiveCfg = Release|Win32
-		{9AC2DE9A-C222-43A7-B184-30190711D421}.Release|Win32.Build.0 = Release|Win32
 		{8E29A7A7-0B81-46DC-BC8E-B782D958DE1E}.Debug|Win32.ActiveCfg = Debug|Win32
 		{8E29A7A7-0B81-46DC-BC8E-B782D958DE1E}.Release|Win32.ActiveCfg = Release|Win32
-		{8E29A7A7-0B81-46DC-BC8E-B782D958DE1E}.Release|Win32.Build.0 = Release|Win32
 		{524A1CD8-CFB5-468C-A202-6AFDE8E5D18B}.Debug|Win32.ActiveCfg = Debug|Win32
 		{524A1CD8-CFB5-468C-A202-6AFDE8E5D18B}.Release|Win32.ActiveCfg = Release|Win32
-		{524A1CD8-CFB5-468C-A202-6AFDE8E5D18B}.Release|Win32.Build.0 = Release|Win32
+		{C6206E87-4F82-4787-9385-5AFC05D9BDC5}.Debug|Win32.ActiveCfg = Debug|Win32
+		{C6206E87-4F82-4787-9385-5AFC05D9BDC5}.Debug|Win32.Build.0 = Debug|Win32
+		{C6206E87-4F82-4787-9385-5AFC05D9BDC5}.Release|Win32.ActiveCfg = Release|Win32
+		{C6206E87-4F82-4787-9385-5AFC05D9BDC5}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
