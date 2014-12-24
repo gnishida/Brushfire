@@ -11,12 +11,14 @@
 #include <list>
 #include <vector>
 #include <time.h>
+#include <opencv/cv.h>
+#include <opencv/highgui.h>
 
-#define CELL_LENGTH 20
-#define CITY_SIZE 200
+#define CELL_LENGTH 100 // 20
+#define CITY_SIZE 40 // 200
 #define MAX_DIST 99
 #define BF_CLEARED -1
-#define MAX_ITERATIONS 1000 //1000
+#define MAX_ITERATIONS 10000 //1000
 #define NUM_FEATURES 5
 #define NUM_PEOPLE_TYPE 1
 
@@ -39,16 +41,16 @@ unsigned int rand(unsigned int* randx) {
     return (*randx)&2147483647;
 }
 
-float randf(unsigned int* randx) {
-	return rand(randx) / (float(2147483647) + 1);
+float randf() {
+	return (float)rand() / RAND_MAX;
 }
 
-float randf(unsigned int* randx, float a, float b) {
-	return randf(randx) * (b - a) + a;
+float randf(float a, float b) {
+	return randf() * (b - a) + a;
 }
 
-int sampleFromCdf(unsigned int* randx, float* cdf, int num) {
-	float rnd = randf(randx, 0, cdf[num-1]);
+int sampleFromCdf(float* cdf, int num) {
+	float rnd = randf(0, cdf[num-1]);
 
 	for (int i = 0; i < num; ++i) {
 		if (rnd <= cdf[i]) return i;
@@ -57,7 +59,7 @@ int sampleFromCdf(unsigned int* randx, float* cdf, int num) {
 	return num - 1;
 }
 
-int sampleFromPdf(unsigned int* randx, float* pdf, int num) {
+int sampleFromPdf(float* pdf, int num) {
 	if (num == 0) return 0;
 
 	float cdf[40];
@@ -70,14 +72,14 @@ int sampleFromPdf(unsigned int* randx, float* pdf, int num) {
 		}
 	}
 
-	return sampleFromCdf(randx, cdf, num);
+	return sampleFromCdf(cdf, num);
 }
 
 void dumpZone(int* zone) {
 	printf("<<< Zone Map >>>\n");
 	for (int r = 0; r < CITY_SIZE; ++r) {
 		for (int c = 0; c < CITY_SIZE; ++c) {
-			printf("%2d ", zone[r * CITY_SIZE + c]);
+			printf("%d ", zone[r * CITY_SIZE + c]);
 		}
 		printf("\n");
 	}
@@ -93,6 +95,23 @@ void dumpDist(int* dist, int featureId) {
 		printf("\n");
 	}
 	printf("\n");
+}
+
+void showZone(int* zone) {
+	cv::Mat m(CITY_SIZE, CITY_SIZE, CV_8UC3);
+	for (int r = 0; r < CITY_SIZE; ++r) {
+		for (int c = 0; c < CITY_SIZE; ++c) {
+			cv::Vec3b p;
+			if (zone[r * CITY_SIZE + c] == 0) {
+				p = cv::Vec3b(255, 0, 0);
+			} else {
+				p = cv::Vec3b(0, 0, 0);
+			}
+			m.at<cv::Vec3b>(r, c) = p;
+		}
+	}
+
+	cv::imwrite("zone.png", m);
 }
 
 inline bool isOcc(int* obst, int s, int featureId) {
@@ -202,8 +221,8 @@ float min3(float distToStore, float distToAmusement, float distToFactory) {
  */
 float computeScore(int* zone, int* dist) {
 	// 好みベクトル
-	float preference[NUM_PEOPLE_TYPE][9];
-	preference[0][0] = 0; preference[0][1] = 0; preference[0][2] = 0; preference[0][3] = 0; preference[0][4] = 0; preference[0][5] = 0; preference[0][6] = 0; preference[0][7] = 1.0; preference[0][8] = 0;
+	float preference[NUM_PEOPLE_TYPE][8];
+	preference[0][0] = 0; preference[0][1] = 0; preference[0][2] = 0; preference[0][3] = 0; preference[0][4] = 0; preference[0][5] = 0; preference[0][6] = 0; preference[0][7] = 1.0;
 	/*
 	preference[0][0] = 0; preference[0][1] = 0; preference[0][2] = 0.15; preference[0][3] = 0.15; preference[0][4] = 0.3; preference[0][5] = 0; preference[0][6] = 0.1; preference[0][7] = 0.1; preference[0][8] = 0.2;
 	preference[1][0] = 0; preference[1][1] = 0; preference[1][2] = 0.15; preference[1][3] = 0; preference[1][4] = 0.55; preference[1][5] = 0; preference[1][6] = 0.2; preference[1][7] = 0.1; preference[1][8] = 0;
@@ -218,7 +237,7 @@ float computeScore(int* zone, int* dist) {
 	*/
 
 	const float ratioPeople[NUM_PEOPLE_TYPE] = {1.0f};//, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-	const float K[] = {0.002f, 0.002f, 0.001f, 0.002f, 0.001f, 0.001f, 0.001f, 0.001f, 0.001f};
+	const float K[] = {0.002f, 0.002f, 0.001f, 0.002f, 0.001f, 0.001f, 0.001f, 0.001f};
 
 	float score = 0.0f;
 
@@ -235,12 +254,6 @@ float computeScore(int* zone, int* dist) {
 			feature[5] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * CELL_LENGTH);
 			feature[6] = 1.0f - exp(-K[6] * min3(dist[i * NUM_FEATURES + 1] * CELL_LENGTH, dist[i * NUM_FEATURES + 3] * CELL_LENGTH, dist[i * NUM_FEATURES + 0] * CELL_LENGTH));
 			feature[7] = 1.0f - exp(-K[7] * dist[i * NUM_FEATURES + 1] * CELL_LENGTH);
-
-			for (int x = 0; x < 8; ++x) {
-				if (feature[x] < 0 || feature[x] > 1) {
-					int hoge = 0;
-				}
-			}
 			
 			score += feature[0] * preference[peopleType][0] * ratioPeople[peopleType]; // 店
 			score += feature[1] * preference[peopleType][1] * ratioPeople[peopleType]; // 学校
@@ -303,11 +316,9 @@ void generateZoningPlan(int* zone, std::vector<float> zoneTypeDistribution) {
 		numRemainings[i] = CITY_SIZE * CITY_SIZE * zoneTypeDistribution[i];
 	}
 
-	unsigned int randx = 0;
-
 	for (int r = 0; r < CITY_SIZE; ++r) {
 		for (int c = 0; c < CITY_SIZE; ++c) {
-			int type = sampleFromPdf(&randx, numRemainings.data(), numRemainings.size());
+			int type = sampleFromPdf(numRemainings.data(), numRemainings.size());
 			zone[r * CITY_SIZE + c] = type;
 			numRemainings[type] -= 1;
 		}
@@ -394,10 +405,10 @@ int main() {
 
 		float proposedScore = computeScore(zone, dist);
 
-		printf("%lf\n", proposedScore);
 
 		if (proposedScore > curScore) { // accept
-			// do nothing
+			curScore = proposedScore;
+			printf("%lf\n", curScore);
 		} else { // reject
 			// rollback
 			queue.clear();
@@ -409,6 +420,12 @@ int main() {
 			updateDistanceMap(queue, zone, dist, obst, toRaise);
 		}
 	}
+
+	dumpZone(zone);
+	dumpDist(dist, 1);
+	check(zone, dist);
+
+	showZone(zone);
 
 	printf("avg bf_count = %d\n", bf_count / MAX_ITERATIONS);
 	printf("total bf_count = %d\n", bf_count);
