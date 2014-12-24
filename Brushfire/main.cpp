@@ -7,8 +7,8 @@
 #define BF_CLEARED -1
 #define BF_TYPE_RAISE 0
 #define BF_TYPE_LOWER 1
-#define MAX_ITERATIONS 100
-#define NUM_FEATURES 1 // 5
+#define MAX_ITERATIONS 25 //1000
+#define NUM_FEATURES 5
 
 int bf_count = 0;
 
@@ -98,12 +98,12 @@ inline int distance(int pos1, int pos2) {
 	return abs(x1 - x2) + abs(y1 - y2);
 }
 
-void clearCell(int* dist, int* obst, int s) {
-	dist[s] = BF_MAX_DIST;
-	obst[s] = BF_CLEARED;
+void clearCell(int* dist, int* obst, int s, int featureId) {
+	dist[s][featureId] = BF_MAX_DIST;
+	obst[s][featureId] = BF_CLEARED;
 }
 
-void raise(std::list<int>& queue, int* dist, int* obst, bool* toRaise, int s) {
+void raise(std::list<std::pair<int, int> >& queue, int* dist, int* obst, bool* toRaise, int s, int featureId) {
 	Point2D adj[] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
 
 	int x = s % CITY_SIZE;
@@ -117,25 +117,22 @@ void raise(std::list<int>& queue, int* dist, int* obst, bool* toRaise, int s) {
 		int n = ny * CITY_SIZE + nx;
 
 		if (obst[n] != BF_CLEARED && !toRaise[n]) {
-			if (!isOcc(obst, obst[n])) {
-				clearCell(dist, obst, n);
+			if (!isOcc(obst, obst[n][featureId])) {
+				clearCell(dist, obst, n, featureId);
 				toRaise[n] = true;
 			}
-			queue.push_back(n);
+			queue.push_back(std::make_pair(n, featureId));
 		}
 	}
 
 	toRaise[s] = false;
 }
 
-void lower(std::list<int>& queue, int* dist, int* obst, bool* toRaise, int s) {
+void lower(std::list<std::pair<int, int> >& queue, int* dist, int* obst, bool* toRaise, int s, int featureId) {
 	Point2D adj[] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
 
 	int x = s % CITY_SIZE;
 	int y = s / CITY_SIZE;
-
-	int ox = obst[s] % CITY_SIZE;
-	int oy = obst[s] / CITY_SIZE;
 
 	for (int i = 0; i < 4; ++i) {
 		int nx = x + adj[i].x;
@@ -145,45 +142,45 @@ void lower(std::list<int>& queue, int* dist, int* obst, bool* toRaise, int s) {
 		int n = ny * CITY_SIZE + nx;
 
 		if (!toRaise[n]) {
-			int d = distance(obst[s], n);
-			if (d < dist[n]) {
-				dist[n] = d;
-				obst[n] = obst[s];
-				queue.push_back(n);
+			int d = distance(obst[s][featureId], n);
+			if (d < dist[n][featureId]) {
+				dist[n][featureId] = d;
+				obst[n][featureId] = obst[s][featureId];
+				queue.push_back(std::make_pair(n, featureId));
 			}
 		}
 	}
 }
 
-void updateDistanceMap(std::list<int>& queue, int* zone, int* dist, int* obst, bool* toRaise) {
+void updateDistanceMap(std::list<std::pair<int, int> >& queue, int* zone, int* dist, int* obst, bool* toRaise) {
 	while (!queue.empty()) {
-		int s = queue.front();
+		std::pair<int, int> s = queue.front();
 		queue.pop_front();
 
-		if (toRaise[s]) {
-			raise(queue, dist, obst, toRaise, s);
+		if (toRaise[s.first]) {
+			raise(queue, dist, obst, toRaise, s.first, s.second);
 		} else if (isOcc(obst, obst[s])) {
-			lower(queue, dist, obst, toRaise, s);
+			lower(queue, dist, obst, toRaise, s.first, s.second);
 		}
 
 		bf_count++;
 	}
 }
 
-void setStore(std::list<int>& queue, int* zone, int* dist, int* obst, bool* toRaise, int s) {
+void setStore(std::list<int>& queue, int* zone, int* dist, int* obst, bool* toRaise, int s, int featureId) {
 	// put stores
-	obst[s] = s;
-	dist[s] = 0;
+	obst[s][featureId] = s;
+	dist[s][featureId] = 0;
 
-	queue.push_back(s);
+	queue.push_back(std::make_pair(s, featureId));
 }
 
-void removeStore(std::list<int>& queue, int* zone, int* dist, int* obst, bool* toRaise, int s) {
-	clearCell(dist, obst, s);
+void removeStore(std::list<int>& queue, int* zone, int* dist, int* obst, bool* toRaise, int s, int featureId) {
+	clearCell(dist, obst, s, featureId);
 
 	toRaise[s] = true;
 
-	queue.push_back(s);
+	queue.push_back(std::make_pair(s, featureId));
 }
 
 /**
@@ -194,23 +191,25 @@ int check(int* zone, int* dist) {
 
 	for (int r = 0; r < CITY_SIZE; ++r) {
 		for (int c = 0; c < CITY_SIZE; ++c) {
-			int min_dist = BF_MAX_DIST;
-			for (int r2 = 0; r2 < CITY_SIZE; ++r2) {
-				for (int c2 = 0; c2 < CITY_SIZE; ++c2) {
-					if (zone[r2 * CITY_SIZE + c2] == 1) {
-						int d = distance(r2 * CITY_SIZE + c2, r * CITY_SIZE + c);
-						if (d < min_dist) {
-							min_dist = d;
+			for (int k = 0; k < NUM_FEATURES; ++k) {
+				int min_dist = BF_MAX_DIST;
+				for (int r2 = 0; r2 < CITY_SIZE; ++r2) {
+					for (int c2 = 0; c2 < CITY_SIZE; ++c2) {
+						if (zone[r2 * CITY_SIZE + c2] == k) {
+							int d = distance(r2 * CITY_SIZE + c2, r * CITY_SIZE + c);
+							if (d < min_dist) {
+								min_dist = d;
+							}
 						}
 					}
 				}
-			}
 
-			if (dist[r * CITY_SIZE + c] != min_dist) {
-				if (count == 0) {
-					printf("e.g. (%d, %d)\n", c, r);
+				if (dist[r * CITY_SIZE + c] != min_dist) {
+					if (count == 0) {
+						printf("e.g. (%d, %d) featureId = %d\n", c, r, k);
+					}
+					count++;
 				}
-				count++;
 			}
 		}
 	}
@@ -246,8 +245,8 @@ int main() {
 	time_t start, end;
 
 	int zone[CITY_SIZE * CITY_SIZE];
-	int dist[CITY_SIZE * CITY_SIZE];
-	int obst[CITY_SIZE * CITY_SIZE];
+	int dist[CITY_SIZE * CITY_SIZE][NUM_FEATURES];
+	int obst[CITY_SIZE * CITY_SIZE][NUM_FEATURES];
 	bool toRaise[CITY_SIZE * CITY_SIZE];
 	
 	// initialize the zone
@@ -268,14 +267,16 @@ int main() {
 	//dumpZone(zone);
 
 	// キューのセットアップ
-	std::list<int> queue;
+	std::list<std::pair<int, int> > queue;
 	for (int i = 0; i < CITY_SIZE * CITY_SIZE; ++i) {
 		toRaise[i] = false;
-		if (zone[i] == 1) {
-			setStore(queue, zone, dist, obst, toRaise, i);
-		} else {
-			dist[i] = BF_MAX_DIST;
-			obst[i] = BF_CLEARED;
+		for (int k = 0; k < NUM_FEATURES; ++k) {
+			if (zone[i] == k) {
+				setStore(queue, zone, dist, obst, toRaise, i, k);
+			} else {
+				dist[i][k] = BF_MAX_DIST;
+				obst[i][k] = BF_CLEARED;
+			}
 		}
 	}
 
@@ -292,7 +293,7 @@ int main() {
 		int s1;
 		while (true) {
 			s1 = rand() % (CITY_SIZE * CITY_SIZE);
-			if (zone[s1] == 1) break;
+			if (zone[s1] > 0) break;
 		}
 
 		int s2;
@@ -302,10 +303,11 @@ int main() {
 		}
 
 		// move a store
+		int featureId = zone[s1] - 1;
 		zone[s1] = 0;
-		removeStore(queue, zone, dist, obst, toRaise, s1);
-		zone[s2] = 1;
-		setStore(queue, zone, dist, obst, toRaise, s2);
+		removeStore(queue, zone, dist, obst, toRaise, s1, featureId);
+		zone[s2] = featureId + featureId;
+		setStore(queue, zone, dist, obst, toRaise, s2, featureId);
 		updateDistanceMap(queue, zone, dist, obst, toRaise);
 		
 		if (check(zone, dist) > 0) break;
