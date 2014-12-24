@@ -2,12 +2,12 @@
 #include <vector>
 #include <time.h>
 
-#define CITY_SIZE 20
+#define CITY_SIZE 200
 #define BF_MAX_DIST 99
 #define BF_CLEARED -1
 #define BF_TYPE_RAISE 0
 #define BF_TYPE_LOWER 1
-#define MAX_ITERATIONS 1000
+#define MAX_ITERATIONS 100
 #define NUM_FEATURES 1 // 5
 
 int bf_count = 0;
@@ -189,7 +189,7 @@ void removeStore(std::list<int>& queue, int* zone, int* dist, int* obst, bool* t
 /**
  * 計算したdistance mapが正しいか、チェックする。
  */
-void check(int* zone, int* dist) {
+int check(int* zone, int* dist) {
 	int count = 0;
 
 	for (int r = 0; r < CITY_SIZE; ++r) {
@@ -218,6 +218,8 @@ void check(int* zone, int* dist) {
 	if (count > 0) {
 		printf("Check results: #error cells = %d\n", count);
 	}
+
+	return count;
 }
 
 /**
@@ -263,26 +265,30 @@ int main() {
 	end = clock();
 	printf("generateZoningPlan: %lf\n", (double)(end-start)/CLOCKS_PER_SEC);
 
+	//dumpZone(zone);
+
 	// キューのセットアップ
 	std::list<int> queue;
 	for (int i = 0; i < CITY_SIZE * CITY_SIZE; ++i) {
+		toRaise[i] = false;
 		if (zone[i] == 1) {
 			setStore(queue, zone, dist, obst, toRaise, i);
 		} else {
 			dist[i] = BF_MAX_DIST;
 			obst[i] = BF_CLEARED;
-			toRaise[i] = false;
 		}
 	}
 
-	dumpZone(zone);
 	updateDistanceMap(queue, zone, dist, obst, toRaise);
-	dumpDist(dist);
+	//dumpDist(dist);
 	check(zone, dist);
 	
-	/*
 	bf_count = 0;
 	for (int iter = 0; iter < MAX_ITERATIONS; ++iter) {
+		printf("iter = %d\n", iter);
+
+		queue.clear();
+
 		int s1;
 		while (true) {
 			s1 = rand() % (CITY_SIZE * CITY_SIZE);
@@ -296,14 +302,16 @@ int main() {
 		}
 
 		// move a store
+		zone[s1] = 0;
 		removeStore(queue, zone, dist, obst, toRaise, s1);
+		zone[s2] = 1;
 		setStore(queue, zone, dist, obst, toRaise, s2);
 		updateDistanceMap(queue, zone, dist, obst, toRaise);
-		check(zone, dist);
+		
+		if (check(zone, dist) > 0) break;
 		//dumpZone(zone);
 		//dumpDist(dist);
 	}
-	*/
 
 	printf("avg bf_count = %d\n", bf_count / MAX_ITERATIONS);
 	printf("total bf_count = %d\n", bf_count);
