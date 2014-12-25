@@ -239,7 +239,7 @@ void setStore(std::list<std::pair<int, int> >& queue, int* zone, int* dist, int*
 void removeStore(std::list<std::pair<int, int> >& queue, int* zone, int* dist, int* obst, bool* toRaise, int s, int featureId) {
 	clearCell(dist, obst, s, featureId);
 
-	toRaise[s + NUM_FEATURES + featureId] = true;
+	toRaise[s * NUM_FEATURES + featureId] = true;
 
 	queue.push_back(std::make_pair(s, featureId));
 }
