@@ -20,7 +20,7 @@
 #define BF_CLEARED -1
 #define NUM_FEATURES 5
 #define NUM_PEOPLE_TYPE 10
-#define NUM_LAYERS 1
+#define NUM_LAYERS 5
 
 struct Point2D {
 	int x;
@@ -392,7 +392,7 @@ void optimize(int city_size, int max_iterations, int* bestZone) {
 	int* zone = (int*)malloc(sizeof(int) * city_size * city_size);
 	int* dist = (int*)malloc(sizeof(int) * city_size * city_size * NUM_FEATURES);
 	int* obst = (int*)malloc(sizeof(int) * city_size * city_size * NUM_FEATURES);
-	bool* toRaise = (bool*)malloc(city_size * city_size);
+	bool* toRaise = (bool*)malloc(city_size * city_size * NUM_FEATURES);
 
 	memcpy(zone, bestZone, sizeof(int) * city_size * city_size);
 
