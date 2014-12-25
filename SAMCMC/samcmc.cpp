@@ -177,16 +177,16 @@ void raise(int city_size, std::list<std::pair<int, int> >& queue, int* dist, int
 		if (nx < 0 || nx >= city_size || ny < 0 || ny >= city_size) continue;
 		int n = ny * city_size + nx;
 
-		if (obst[n * NUM_FEATURES + featureId] != BF_CLEARED && !toRaise[n]) {
+		if (obst[n * NUM_FEATURES + featureId] != BF_CLEARED && !toRaise[n * NUM_FEATURES + featureId]) {
 			if (!isOcc(obst, obst[n * NUM_FEATURES + featureId], featureId)) {
 				clearCell(dist, obst, n, featureId);
-				toRaise[n] = true;
+				toRaise[n * NUM_FEATURES + featureId] = true;
 			}
 			queue.push_back(std::make_pair(n, featureId));
 		}
 	}
 
-	toRaise[s] = false;
+	toRaise[s * NUM_FEATURES + featureId] = false;
 }
 
 void lower(int city_size, std::list<std::pair<int, int> >& queue, int* dist, int* obst, bool* toRaise, int s, int featureId) {
@@ -202,7 +202,7 @@ void lower(int city_size, std::list<std::pair<int, int> >& queue, int* dist, int
 		if (nx < 0 || nx >= city_size || ny < 0 || ny >= city_size) continue;
 		int n = ny * city_size + nx;
 
-		if (!toRaise[n]) {
+		if (!toRaise[n * NUM_FEATURES + featureId]) {
 			int d = distance(city_size, obst[s * NUM_FEATURES + featureId], n);
 			if (d < dist[n * NUM_FEATURES + featureId]) {
 				dist[n * NUM_FEATURES + featureId] = d;
@@ -218,7 +218,7 @@ void updateDistanceMap(int city_size, std::list<std::pair<int, int> >& queue, in
 		std::pair<int, int> s = queue.front();
 		queue.pop_front();
 
-		if (toRaise[s.first]) {
+		if (toRaise[s.first * NUM_FEATURES + s.second]) {
 			raise(city_size, queue, dist, obst, toRaise, s.first, s.second);
 		} else if (isOcc(obst, obst[s.first * NUM_FEATURES + s.second], s.second)) {
 			lower(city_size, queue, dist, obst, toRaise, s.first, s.second);
@@ -237,7 +237,7 @@ void setStore(std::list<std::pair<int, int> >& queue, int* zone, int* dist, int*
 void removeStore(std::list<std::pair<int, int> >& queue, int* zone, int* dist, int* obst, bool* toRaise, int s, int featureId) {
 	clearCell(dist, obst, s, featureId);
 
-	toRaise[s] = true;
+	toRaise[s * NUM_FEATURES + featureId] = true;
 
 	queue.push_back(std::make_pair(s, featureId));
 }
@@ -449,6 +449,129 @@ void optimize(int city_size, int max_iterations, int* bestZone) {
 		removeStore(queue, zone, dist, obst, toRaise, s1, featureId);
 		zone[s2] = featureId + 1;
 		setStore(queue, zone, dist, obst, toRaise, s2, featureId);
+		updateDistanceMap(city_size, queue, zone, dist, obst, toRaise);
+		
+		//dumpZone(city_size, zone);
+		//dumpDist(city_size, dist, 4);
+		//if (check(city_size, zone, dist) > 0) break;
+
+		float proposedScore = computeScore(city_size, zone, dist);
+
+		// ベストゾーンを更新
+		if (proposedScore > bestScore) {
+			bestScore = proposedScore;
+			memcpy(bestZone, zone, sizeof(int) * city_size * city_size);
+		}
+
+		//printf("%lf -> %lf (best: %lf)\n", curScore, proposedScore, bestScore);
+
+		if (proposedScore > curScore || randf() < proposedScore / curScore) { // accept
+			curScore = proposedScore;
+		} else { // reject
+			// rollback
+			memcpy(zone, tmpZone, sizeof(int) * city_size * city_size);
+			memcpy(dist, tmpDist, sizeof(int) * city_size * city_size * NUM_FEATURES);
+			memcpy(obst, tmpObst, sizeof(int) * city_size * city_size * NUM_FEATURES);
+		}
+	}
+
+	printf("city_size: %d, score: %lf\n", city_size, bestScore);
+
+	char filename[256];
+	sprintf(filename, "zone_%d.png", city_size);
+	showZone(city_size, bestZone, filename);
+	//saveZone(city_size, bestZone);
+}
+
+/**
+ * bestZoneに、初期ゾーンプランが入っている。
+ * MCMCを使って、最適なゾーンプランを探し、bestZoneに格納して返却する。
+ * 各ステップでは、隣接セルをランダムに選択し、ゾーンを交換する。
+ */
+void optimize2(int city_size, int max_iterations, int* bestZone) {
+	int* zone = (int*)malloc(sizeof(int) * city_size * city_size);
+	int* dist = (int*)malloc(sizeof(int) * city_size * city_size * NUM_FEATURES);
+	int* obst = (int*)malloc(sizeof(int) * city_size * city_size * NUM_FEATURES);
+	bool* toRaise = (bool*)malloc(city_size * city_size * NUM_FEATURES);
+
+	memcpy(zone, bestZone, sizeof(int) * city_size * city_size);
+
+	// for backup
+	int* tmpZone = (int*)malloc(sizeof(int) * city_size * city_size);
+	int* tmpDist = (int*)malloc(sizeof(int) * city_size * city_size * NUM_FEATURES);
+	int* tmpObst = (int*)malloc(sizeof(int) * city_size * city_size * NUM_FEATURES);
+
+	// キューのセットアップ
+	std::list<std::pair<int, int> > queue;
+	for (int i = 0; i < city_size * city_size; ++i) {
+		for (int k = 0; k < NUM_FEATURES; ++k) {
+			toRaise[i * NUM_FEATURES + k] = false;
+			if (zone[i] - 1 == k) {
+				setStore(queue, zone, dist, obst, toRaise, i, k);
+			} else {
+				dist[i * NUM_FEATURES + k] = MAX_DIST;
+				obst[i * NUM_FEATURES + k] = BF_CLEARED;
+			}
+		}
+	}
+
+	updateDistanceMap(city_size, queue, zone, dist, obst, toRaise);
+
+	//dumpZone(city_size, zone);
+	//dumpDist(city_size, dist, 4);
+	//check(city_size, zone, dist);
+
+	float curScore = computeScore(city_size, zone, dist);
+	float bestScore = curScore;
+	memcpy(bestZone, zone, sizeof(int) * city_size * city_size);
+
+	float beta = 1.0f;
+	int adj[4];
+	adj[0] = -1; adj[1] = 1; adj[2] = -city_size; adj[3] = city_size;
+	for (int iter = 0; iter < max_iterations; ++iter) {
+		queue.clear();
+
+		// バックアップ
+		memcpy(tmpZone, zone, sizeof(int) * city_size * city_size);
+		memcpy(tmpDist, dist, sizeof(int) * city_size * city_size * NUM_FEATURES);
+		memcpy(tmpObst, obst, sizeof(int) * city_size * city_size * NUM_FEATURES);
+
+		// ２つの隣接セルを選択
+		int s1, s2;
+		while (true) {
+			s1 = rand() % (city_size * city_size);
+			int u = rand() % 4;
+			s2 = s1 + adj[u];
+
+			if (s2 < 0 || s2 >= city_size * city_size) continue;
+			if (zone[s1] == zone[s2]) continue;
+
+			int x1 = s1 % city_size;
+			int y1 = s1 / city_size;
+			int x2 = s2 % city_size;
+			int y2 = s2 / city_size;
+			if (abs(x1 - x2) + abs(y1 - y2) > 1) continue;
+
+			break;
+		}
+
+		// ２つのセルのゾーンタイプを交換
+		int f1 = zone[s1] - 1;
+		int f2 = zone[s2] - 1;
+		zone[s1] = f2 + 1;
+		if (f1 >= 0) {
+			removeStore(queue, zone, dist, obst, toRaise, s1, f1);
+		}
+		if (f2 >= 0) {
+			setStore(queue, zone, dist, obst, toRaise, s1, f2);
+		}
+		zone[s2] = f1 + 1;
+		if (f2 >= 0) {
+			removeStore(queue, zone, dist, obst, toRaise, s2, f2);
+		}
+		if (f1 >= 0) {
+			setStore(queue, zone, dist, obst, toRaise, s2, f1);
+		}
 		updateDistanceMap(city_size, queue, zone, dist, obst, toRaise);
 		
 		//dumpZone(city_size, zone);

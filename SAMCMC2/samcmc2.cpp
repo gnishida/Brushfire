@@ -268,7 +268,7 @@ float computeScore(int city_size, int* zone, int* dist) {
 	preference[8][0] = 0.25; preference[8][1] = 0; preference[8][2] = 0.1; preference[8][3] = 0.05; preference[8][4] = 0; preference[8][5] = 0; preference[8][6] = 0.25; preference[8][7] = 0.35;
 	preference[9][0] = 0.25; preference[9][1] = 0; preference[9][2] = 0.2; preference[9][3] = 0; preference[9][4] = 0; preference[9][5] = 0; preference[9][6] = 0.2; preference[9][7] = 0.35;
 
-	const float ratioPeople[10] = {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+	const float ratioPeople[10] = {0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1};
 	const float K[] = {0.002f, 0.002f, 0.001f, 0.002f, 0.001f, 0.001f, 0.001f, 0.001f};
 
 	float score = 0.0f;
@@ -427,7 +427,6 @@ void optimize(int city_size, int max_iterations, int* bestZone) {
 
 	float beta = 1.0f;
 	for (int iter = 0; iter < max_iterations; ++iter) {
-		printf("%d\n", iter);
 		queue.clear();
 
 		// バックアップ
@@ -637,12 +636,11 @@ int main() {
 	int max_iterations = 10000;
 
 	for (int layer = 0; layer < NUM_LAYERS; ++layer) {
-		optimize(city_size, max_iterations, zone);
-		/*if (layer == 0) {
+		if (layer == 0) {
 			optimize(city_size, max_iterations, zone);
 		} else {
 			optimize2(city_size, max_iterations, zone);
-		}*/
+		}
 		int* tmpZone = (int*)malloc(sizeof(int) * city_size * city_size);
 		memcpy(tmpZone, zone, sizeof(int) * city_size * city_size);
 
