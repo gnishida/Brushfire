@@ -15,7 +15,7 @@
 #include <list>
 #include <time.h>
 
-#define CELL_LENGTH 200
+#define cell_length 200
 #define CITY_SIZE 5 //200
 #define GPU_BLOCK_SIZE 5 //40
 #define GPU_NUM_THREADS 2 //96

@@ -14,8 +14,6 @@
 #include <opencv/cv.h>
 #include <opencv/highgui.h>
 
-#define CELL_LENGTH 4000 // 20
-#define CITY_SIZE 5 // 200
 #define MAX_DIST 99
 #define BF_CLEARED -1
 #define MAX_ITERATIONS 10000 //1000
@@ -75,44 +73,44 @@ int sampleFromPdf(float* pdf, int num) {
 	return sampleFromCdf(cdf, num);
 }
 
-void dumpZone(int* zone) {
+void dumpZone(int city_size, int* zone) {
 	printf("<<< Zone Map >>>\n");
-	for (int r = 0; r < CITY_SIZE; ++r) {
-		for (int c = 0; c < CITY_SIZE; ++c) {
-			printf("%d ", zone[r * CITY_SIZE + c]);
+	for (int r = 0; r < city_size; ++r) {
+		for (int c = 0; c < city_size; ++c) {
+			printf("%d ", zone[r * city_size + c]);
 		}
 		printf("\n");
 	}
 	printf("\n");
 }
 
-void dumpDist(int* dist, int featureId) {
+void dumpDist(int city_size, int* dist, int featureId) {
 	printf("<<< Distance Map (featureId = %d) >>>\n", featureId);
-	for (int r = 0; r < CITY_SIZE; ++r) {
-		for (int c = 0; c < CITY_SIZE; ++c) {
-			printf("%2d ", dist[(r * CITY_SIZE + c) * NUM_FEATURES + featureId]);
+	for (int r = 0; r < city_size; ++r) {
+		for (int c = 0; c < city_size; ++c) {
+			printf("%2d ", dist[(r * city_size + c) * NUM_FEATURES + featureId]);
 		}
 		printf("\n");
 	}
 	printf("\n");
 }
 
-void showZone(int* zone) {
-	cv::Mat m(CITY_SIZE, CITY_SIZE, CV_8UC3);
-	for (int r = 0; r < CITY_SIZE; ++r) {
-		for (int c = 0; c < CITY_SIZE; ++c) {
+void showZone(int city_size, int* zone) {
+	cv::Mat m(city_size, city_size, CV_8UC3);
+	for (int r = 0; r < city_size; ++r) {
+		for (int c = 0; c < city_size; ++c) {
 			cv::Vec3b p;
-			if (zone[r * CITY_SIZE + c] == 0) {
+			if (zone[r * city_size + c] == 0) {
 				p = cv::Vec3b(0, 0, 255);
-			} else if (zone[r * CITY_SIZE + c] == 1) {
+			} else if (zone[r * city_size + c] == 1) {
 				p = cv::Vec3b(255, 0, 0);
-			} else if (zone[r * CITY_SIZE + c] == 2) {
+			} else if (zone[r * city_size + c] == 2) {
 				p = cv::Vec3b(64, 64, 64);
-			} else if (zone[r * CITY_SIZE + c] == 3) {
+			} else if (zone[r * city_size + c] == 3) {
 				p = cv::Vec3b(0, 255, 0);
-			} else if (zone[r * CITY_SIZE + c] == 4) {
+			} else if (zone[r * city_size + c] == 4) {
 				p = cv::Vec3b(255, 0, 255);
-			} else if (zone[r * CITY_SIZE + c] == 5) {
+			} else if (zone[r * city_size + c] == 5) {
 				p = cv::Vec3b(0, 255, 255);
 			} else {
 				p = cv::Vec3b(255, 255, 255);
@@ -124,24 +122,24 @@ void showZone(int* zone) {
 	cv::imwrite("zone.png", m);
 }
 
-void loadZone(int* zone, char* filename) {
+void loadZone(int city_size, int* zone, char* filename) {
 	FILE* fp = fopen(filename, "r");
 
-	for (int r = 0; r < CITY_SIZE; ++r) {
-		for (int c = 0; c < CITY_SIZE; ++c) {
-			fscanf(fp, "%d,", &zone[r * CITY_SIZE + c]);
+	for (int r = 0; r < city_size; ++r) {
+		for (int c = 0; c < city_size; ++c) {
+			fscanf(fp, "%d,", &zone[r * city_size + c]);
 		}
 	}
 
 	fclose(fp);
 }
 
-void saveZone(int* zone) {
+void saveZone(int city_size, int* zone) {
 	FILE* fp = fopen("zone.txt", "w");
 
-	for (int r = 0; r < CITY_SIZE; ++r) {
-		for (int c = 0; c < CITY_SIZE; ++c) {
-			fprintf(fp, "%d,", zone[r * CITY_SIZE + c]);
+	for (int r = 0; r < city_size; ++r) {
+		for (int c = 0; c < city_size; ++c) {
+			fprintf(fp, "%d,", zone[r * city_size + c]);
 		}
 		fprintf(fp, "\n");
 	}
@@ -154,11 +152,11 @@ inline bool isOcc(int* obst, int s, int featureId) {
 	return obst[s * NUM_FEATURES + featureId] == s;
 }
 
-inline int distance(int pos1, int pos2) {
-	int x1 = pos1 % CITY_SIZE;
-	int y1 = pos1 / CITY_SIZE;
-	int x2 = pos2 % CITY_SIZE;
-	int y2 = pos2 / CITY_SIZE;
+inline int distance(int city_size, int pos1, int pos2) {
+	int x1 = pos1 % city_size;
+	int y1 = pos1 / city_size;
+	int x2 = pos2 % city_size;
+	int y2 = pos2 / city_size;
 
 	return abs(x1 - x2) + abs(y1 - y2);
 }
@@ -168,18 +166,18 @@ void clearCell(int* dist, int* obst, int s, int featureId) {
 	obst[s * NUM_FEATURES + featureId] = BF_CLEARED;
 }
 
-void raise(std::list<std::pair<int, int> >& queue, int* dist, int* obst, bool* toRaise, int s, int featureId) {
+void raise(int city_size, std::list<std::pair<int, int> >& queue, int* dist, int* obst, bool* toRaise, int s, int featureId) {
 	Point2D adj[] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
 
-	int x = s % CITY_SIZE;
-	int y = s / CITY_SIZE;
+	int x = s % city_size;
+	int y = s / city_size;
 
 	for (int i = 0; i < 4; ++i) {
 		int nx = x + adj[i].x;
 		int ny = y + adj[i].y;
 
-		if (nx < 0 || nx >= CITY_SIZE || ny < 0 || ny >= CITY_SIZE) continue;
-		int n = ny * CITY_SIZE + nx;
+		if (nx < 0 || nx >= city_size || ny < 0 || ny >= city_size) continue;
+		int n = ny * city_size + nx;
 
 		if (obst[n * NUM_FEATURES + featureId] != BF_CLEARED && !toRaise[n]) {
 			if (!isOcc(obst, obst[n * NUM_FEATURES + featureId], featureId)) {
@@ -193,21 +191,21 @@ void raise(std::list<std::pair<int, int> >& queue, int* dist, int* obst, bool* t
 	toRaise[s] = false;
 }
 
-void lower(std::list<std::pair<int, int> >& queue, int* dist, int* obst, bool* toRaise, int s, int featureId) {
+void lower(int city_size, std::list<std::pair<int, int> >& queue, int* dist, int* obst, bool* toRaise, int s, int featureId) {
 	Point2D adj[] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
 
-	int x = s % CITY_SIZE;
-	int y = s / CITY_SIZE;
+	int x = s % city_size;
+	int y = s / city_size;
 
 	for (int i = 0; i < 4; ++i) {
 		int nx = x + adj[i].x;
 		int ny = y + adj[i].y;
 
-		if (nx < 0 || nx >= CITY_SIZE || ny < 0 || ny >= CITY_SIZE) continue;
-		int n = ny * CITY_SIZE + nx;
+		if (nx < 0 || nx >= city_size || ny < 0 || ny >= city_size) continue;
+		int n = ny * city_size + nx;
 
 		if (!toRaise[n]) {
-			int d = distance(obst[s * NUM_FEATURES + featureId], n);
+			int d = distance(city_size, obst[s * NUM_FEATURES + featureId], n);
 			if (d < dist[n * NUM_FEATURES + featureId]) {
 				dist[n * NUM_FEATURES + featureId] = d;
 				obst[n * NUM_FEATURES + featureId] = obst[s * NUM_FEATURES + featureId];
@@ -217,15 +215,15 @@ void lower(std::list<std::pair<int, int> >& queue, int* dist, int* obst, bool* t
 	}
 }
 
-void updateDistanceMap(std::list<std::pair<int, int> >& queue, int* zone, int* dist, int* obst, bool* toRaise) {
+void updateDistanceMap(int city_size, std::list<std::pair<int, int> >& queue, int* zone, int* dist, int* obst, bool* toRaise) {
 	while (!queue.empty()) {
 		std::pair<int, int> s = queue.front();
 		queue.pop_front();
 
 		if (toRaise[s.first]) {
-			raise(queue, dist, obst, toRaise, s.first, s.second);
+			raise(city_size, queue, dist, obst, toRaise, s.first, s.second);
 		} else if (isOcc(obst, obst[s.first * NUM_FEATURES + s.second], s.second)) {
-			lower(queue, dist, obst, toRaise, s.first, s.second);
+			lower(city_size, queue, dist, obst, toRaise, s.first, s.second);
 		}
 
 		bf_count++;
@@ -255,7 +253,9 @@ float min3(float distToStore, float distToAmusement, float distToFactory) {
 /** 
  * ゾーンのスコアを計算する。
  */
-float computeScore(int* zone, int* dist) {
+float computeScore(int city_size, int* zone, int* dist) {
+	int cell_length = 10000 / city_size;
+
 	// 好みベクトル
 	float preference[NUM_PEOPLE_TYPE][8];
 	preference[0][0] = 0; preference[0][1] = 0; preference[0][2] = 0; preference[0][3] = 0; preference[0][4] = 0; preference[0][5] = 0; preference[0][6] = 0; preference[0][7] = 1.0;
@@ -278,21 +278,21 @@ float computeScore(int* zone, int* dist) {
 	float score = 0.0f;
 
 	int num_zones = 0;
-	for (int i = 0; i < CITY_SIZE * CITY_SIZE; ++i) {
+	for (int i = 0; i < city_size * city_size; ++i) {
 		if (zone[i] == 0) continue;
 
 		num_zones++;
 
 		for (int peopleType = 0; peopleType < NUM_PEOPLE_TYPE; ++peopleType) {
 			float feature[8];
-			feature[0] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * CELL_LENGTH);
-			feature[1] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * CELL_LENGTH);
-			feature[2] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * CELL_LENGTH);
-			feature[3] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * CELL_LENGTH);
-			feature[4] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * CELL_LENGTH);
-			feature[5] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * CELL_LENGTH);
-			feature[6] = 1.0f - exp(-K[6] * min3(dist[i * NUM_FEATURES + 1] * CELL_LENGTH, dist[i * NUM_FEATURES + 3] * CELL_LENGTH, dist[i * NUM_FEATURES + 0] * CELL_LENGTH));
-			feature[7] = 1.0f - exp(-K[7] * dist[i * NUM_FEATURES + 1] * CELL_LENGTH);
+			feature[0] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * cell_length);
+			feature[1] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * cell_length);
+			feature[2] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * cell_length);
+			feature[3] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * cell_length);
+			feature[4] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * cell_length);
+			feature[5] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * cell_length);
+			feature[6] = 1.0f - exp(-K[6] * min3(dist[i * NUM_FEATURES + 1] * cell_length, dist[i * NUM_FEATURES + 3] * cell_length, dist[i * NUM_FEATURES + 0] * cell_length));
+			feature[7] = 1.0f - exp(-K[7] * dist[i * NUM_FEATURES + 1] * cell_length);
 			
 			score += feature[0] * preference[peopleType][0] * ratioPeople[peopleType]; // 店
 			score += feature[1] * preference[peopleType][1] * ratioPeople[peopleType]; // 学校
@@ -311,17 +311,17 @@ float computeScore(int* zone, int* dist) {
 /**
  * 計算したdistance mapが正しいか、チェックする。
  */
-int check(int* zone, int* dist) {
+int check(int city_size, int* zone, int* dist) {
 	int count = 0;
 
-	for (int r = 0; r < CITY_SIZE; ++r) {
-		for (int c = 0; c < CITY_SIZE; ++c) {
+	for (int r = 0; r < city_size; ++r) {
+		for (int c = 0; c < city_size; ++c) {
 			for (int k = 0; k < NUM_FEATURES; ++k) {
 				int min_dist = MAX_DIST;
-				for (int r2 = 0; r2 < CITY_SIZE; ++r2) {
-					for (int c2 = 0; c2 < CITY_SIZE; ++c2) {
-						if (zone[r2 * CITY_SIZE + c2] - 1 == k) {
-							int d = distance(r2 * CITY_SIZE + c2, r * CITY_SIZE + c);
+				for (int r2 = 0; r2 < city_size; ++r2) {
+					for (int c2 = 0; c2 < city_size; ++c2) {
+						if (zone[r2 * city_size + c2] - 1 == k) {
+							int d = distance(city_size, r2 * city_size + c2, r * city_size + c);
 							if (d < min_dist) {
 								min_dist = d;
 							}
@@ -329,7 +329,7 @@ int check(int* zone, int* dist) {
 					}
 				}
 
-				if (dist[(r * CITY_SIZE + c) * NUM_FEATURES + k] != min_dist) {
+				if (dist[(r * city_size + c) * NUM_FEATURES + k] != min_dist) {
 					if (count == 0) {
 						printf("e.g. (%d, %d) featureId = %d\n", c, r, k);
 					}
@@ -349,16 +349,16 @@ int check(int* zone, int* dist) {
 /**
  * ゾーンプランを生成する。
  */
-void generateZoningPlan(int* zone, std::vector<float> zoneTypeDistribution) {
+void generateZoningPlan(int city_size, int* zone, std::vector<float> zoneTypeDistribution) {
 	std::vector<float> numRemainings(NUM_FEATURES + 1);
 	for (int i = 0; i < NUM_FEATURES + 1; ++i) {
-		numRemainings[i] = CITY_SIZE * CITY_SIZE * zoneTypeDistribution[i];
+		numRemainings[i] = city_size * city_size * zoneTypeDistribution[i];
 	}
 
-	for (int r = 0; r < CITY_SIZE; ++r) {
-		for (int c = 0; c < CITY_SIZE; ++c) {
+	for (int r = 0; r < city_size; ++r) {
+		for (int c = 0; c < city_size; ++c) {
 			int type = sampleFromPdf(numRemainings.data(), numRemainings.size());
-			zone[r * CITY_SIZE + c] = type;
+			zone[r * city_size + c] = type;
 			numRemainings[type] -= 1;
 		}
 	}
@@ -368,19 +368,19 @@ void generateZoningPlan(int* zone, std::vector<float> zoneTypeDistribution) {
 	// デバッグ用
 	// 工場を一番上に持っていく
 	// そうすれば、良いゾーンプランになるはず。。。
-	for (int r = 2; r < CITY_SIZE; ++r) {
-		for (int c = 0; c < CITY_SIZE; ++c) {
-			if (zone[r * CITY_SIZE + c] != 2) continue;
+	for (int r = 2; r < city_size; ++r) {
+		for (int c = 0; c < city_size; ++c) {
+			if (zone[r * city_size + c] != 2) continue;
 
 			bool done = false;
 			for (int r2 = 0; r2 < 2 && !done; ++r2) {
-				for (int c2 = 0; c2 < CITY_SIZE && !done; ++c2) {
-					if (zone[r2 * CITY_SIZE + c2] == 2) continue;
+				for (int c2 = 0; c2 < city_size && !done; ++c2) {
+					if (zone[r2 * city_size + c2] == 2) continue;
 
 					// 交換する
-					int type = zone[r2 * CITY_SIZE + c2];
-					zone[r2 * CITY_SIZE + c2] = zone[r * CITY_SIZE + c];
-					zone[r * CITY_SIZE + c] = type;
+					int type = zone[r2 * city_size + c2];
+					zone[r2 * city_size + c2] = zone[r * city_size + c];
+					zone[r * city_size + c] = type;
 					done = true;
 				}
 			}
@@ -388,39 +388,25 @@ void generateZoningPlan(int* zone, std::vector<float> zoneTypeDistribution) {
 	}
 }
 
-int main() {
-	time_t start, end;
-
+/**
+ * bestZoneに、初期ゾーンプランが入っている。
+ * MCMCを使って、最適なゾーンプランを探し、bestZoneに格納して返却する。
+ */
+void optimize(int city_size, int* bestZone) {
 	int* zone;
-	zone = (int*)malloc(sizeof(int) * CITY_SIZE * CITY_SIZE);
+	zone = (int*)malloc(sizeof(int) * city_size * city_size);
 	int* dist;
-	dist = (int*)malloc(sizeof(int) * CITY_SIZE * CITY_SIZE * NUM_FEATURES);
+	dist = (int*)malloc(sizeof(int) * city_size * city_size * NUM_FEATURES);
 	int* obst;
-	obst = (int*)malloc(sizeof(int) * CITY_SIZE * CITY_SIZE * NUM_FEATURES);
+	obst = (int*)malloc(sizeof(int) * city_size * city_size * NUM_FEATURES);
 	bool* toRaise;
-	toRaise = (bool*)malloc(CITY_SIZE * CITY_SIZE);
-	int* bestZone;
-	bestZone = (int*)malloc(sizeof(int) * CITY_SIZE * CITY_SIZE);
-	
-	// initialize the zone
-	std::vector<float> zoneTypeDistribution(6);
-	zoneTypeDistribution[0] = 0.5f; // 住宅
-	zoneTypeDistribution[1] = 0.2f; // 商業
-	zoneTypeDistribution[2] = 0.1f; // 工場
-	zoneTypeDistribution[3] = 0.1f; // 公園
-	zoneTypeDistribution[4] = 0.05f; // アミューズメント
-	zoneTypeDistribution[5] = 0.05f; // 学校・図書館
+	toRaise = (bool*)malloc(city_size * city_size);
 
-	// 初期プランを生成
-	start = clock();
-	generateZoningPlan(zone, zoneTypeDistribution);
-	//loadZone(zone, "zone2.txt");
-	end = clock();
-	printf("generateZoningPlan: %lf\n", (double)(end-start)/CLOCKS_PER_SEC);
+	memcpy(zone, bestZone, sizeof(int) * city_size * city_size);
 
 	// キューのセットアップ
 	std::list<std::pair<int, int> > queue;
-	for (int i = 0; i < CITY_SIZE * CITY_SIZE; ++i) {
+	for (int i = 0; i < city_size * city_size; ++i) {
 		toRaise[i] = false;
 		for (int k = 0; k < NUM_FEATURES; ++k) {
 			if (zone[i] - 1 == k) {
@@ -432,15 +418,15 @@ int main() {
 		}
 	}
 
-	updateDistanceMap(queue, zone, dist, obst, toRaise);
+	updateDistanceMap(city_size, queue, zone, dist, obst, toRaise);
 
-	//dumpZone(zone);
-	//dumpDist(dist, 4);
-	//check(zone, dist);
+	//dumpZone(city_size, zone);
+	//dumpDist(city_size, dist, 4);
+	//check(city_size, zone, dist);
 
-	float curScore = computeScore(zone, dist);
+	float curScore = computeScore(city_size, zone, dist);
 	float bestScore = curScore;
-	memcpy(bestZone, zone, sizeof(int) * CITY_SIZE * CITY_SIZE);
+	memcpy(bestZone, zone, sizeof(int) * city_size * city_size);
 
 	bf_count = 0;
 	float beta = 1.0f;
@@ -450,13 +436,13 @@ int main() {
 		// ２つのセルのゾーンタイプを交換
 		int s1;
 		while (true) {
-			s1 = rand() % (CITY_SIZE * CITY_SIZE);
+			s1 = rand() % (city_size * city_size);
 			if (zone[s1] > 0) break;
 		}
 
 		int s2;
 		while (true) {
-			s2 = rand() % (CITY_SIZE * CITY_SIZE);
+			s2 = rand() % (city_size * city_size);
 			if (zone[s2] == 0) break;
 		}
 
@@ -466,18 +452,18 @@ int main() {
 		removeStore(queue, zone, dist, obst, toRaise, s1, featureId);
 		zone[s2] = featureId + 1;
 		setStore(queue, zone, dist, obst, toRaise, s2, featureId);
-		updateDistanceMap(queue, zone, dist, obst, toRaise);
+		updateDistanceMap(city_size, queue, zone, dist, obst, toRaise);
 		
-		//dumpZone(zone);
-		//dumpDist(dist, 4);
-		//if (check(zone, dist) > 0) break;
+		//dumpZone(city_size, zone);
+		//dumpDist(city_size, dist, 4);
+		//if (check(city_size, zone, dist) > 0) break;
 
-		float proposedScore = computeScore(zone, dist);
+		float proposedScore = computeScore(city_size, zone, dist);
 
 		// ベストゾーンを更新
 		if (proposedScore > bestScore) {
 			bestScore = proposedScore;
-			memcpy(bestZone, zone, sizeof(int) * CITY_SIZE * CITY_SIZE);
+			memcpy(bestZone, zone, sizeof(int) * city_size * city_size);
 		}
 
 		//printf("%lf -> %lf (best: %lf)\n", curScore, proposedScore, bestScore);
@@ -492,17 +478,69 @@ int main() {
 			removeStore(queue, zone, dist, obst, toRaise, s2, featureId);
 			zone[s1] = featureId + 1;
 			setStore(queue, zone, dist, obst, toRaise, s1, featureId);
-			updateDistanceMap(queue, zone, dist, obst, toRaise);
+			updateDistanceMap(city_size, queue, zone, dist, obst, toRaise);
 		}
 	}
 
-	printf("score: %lf\n", bestScore);
+	printf("city_size: %d, score: %lf\n", city_size, bestScore);
 
-	showZone(bestZone);
-	saveZone(bestZone);
+	//showZone(city_size, bestZone);
+	//saveZone(city_size, bestZone);
+}
 
-	printf("avg bf_count = %d\n", bf_count / MAX_ITERATIONS);
-	printf("total bf_count = %d\n", bf_count);
+int main() {
+	time_t start, end;
+
+	int city_size = 5;
+
+	int* zone;
+	zone = (int*)malloc(sizeof(int) * city_size * city_size);
+	int* dist;
+	dist = (int*)malloc(sizeof(int) * city_size * city_size * NUM_FEATURES);
+	int* obst;
+	obst = (int*)malloc(sizeof(int) * city_size * city_size * NUM_FEATURES);
+	bool* toRaise;
+	toRaise = (bool*)malloc(city_size * city_size);
+	int* bestZone;
+	bestZone = (int*)malloc(sizeof(int) * city_size * city_size);
+	
+	// initialize the zone
+	std::vector<float> zoneTypeDistribution(6);
+	zoneTypeDistribution[0] = 0.5f; // 住宅
+	zoneTypeDistribution[1] = 0.2f; // 商業
+	zoneTypeDistribution[2] = 0.1f; // 工場
+	zoneTypeDistribution[3] = 0.1f; // 公園
+	zoneTypeDistribution[4] = 0.05f; // アミューズメント
+	zoneTypeDistribution[5] = 0.05f; // 学校・図書館
+
+	// 初期プランを生成
+	start = clock();
+	generateZoningPlan(city_size, zone, zoneTypeDistribution);
+	//loadZone(zone, "zone2.txt");
+	end = clock();
+	printf("generateZoningPlan: %lf\n", (double)(end-start)/CLOCKS_PER_SEC);
+
+	for (int layer = 0; layer < 3; ++layer) {
+		optimize(city_size, zone);
+		int* tmpZone = (int*)malloc(sizeof(int) * city_size * city_size);
+		memcpy(tmpZone, zone, sizeof(int) * city_size * city_size);
+
+		free(zone);
+
+		// ゾーンマップを、たて、よこ、２倍ずつに増やす
+		city_size *= 2;
+		zone = (int*)malloc(sizeof(int) * city_size * city_size);
+		for (int r = 0; r < city_size; ++r) {
+			for (int c = 0; c < city_size; ++c) {
+				int oldR = r / 2;
+				int oldC = c / 2;
+				zone[r * city_size + c] = tmpZone[(int)(oldR * city_size * 0.5 + oldC)];
+			}
+		}
+	}
+	
+	showZone(city_size, zone);
+	saveZone(city_size, zone);
 
 	return 0;
 }

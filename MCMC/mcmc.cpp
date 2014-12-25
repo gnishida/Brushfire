@@ -14,7 +14,7 @@
 #include <opencv/cv.h>
 #include <opencv/highgui.h>
 
-#define CELL_LENGTH 4000 // 20
+#define cell_length 4000 // 20
 #define CITY_SIZE 5 // 200
 #define MAX_DIST 99
 #define BF_CLEARED -1
@@ -285,14 +285,14 @@ float computeScore(int* zone, int* dist) {
 
 		for (int peopleType = 0; peopleType < NUM_PEOPLE_TYPE; ++peopleType) {
 			float feature[8];
-			feature[0] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * CELL_LENGTH);
-			feature[1] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * CELL_LENGTH);
-			feature[2] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * CELL_LENGTH);
-			feature[3] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * CELL_LENGTH);
-			feature[4] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * CELL_LENGTH);
-			feature[5] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * CELL_LENGTH);
-			feature[6] = 1.0f - exp(-K[6] * min3(dist[i * NUM_FEATURES + 1] * CELL_LENGTH, dist[i * NUM_FEATURES + 3] * CELL_LENGTH, dist[i * NUM_FEATURES + 0] * CELL_LENGTH));
-			feature[7] = 1.0f - exp(-K[7] * dist[i * NUM_FEATURES + 1] * CELL_LENGTH);
+			feature[0] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * cell_length);
+			feature[1] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * cell_length);
+			feature[2] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * cell_length);
+			feature[3] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * cell_length);
+			feature[4] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * cell_length);
+			feature[5] = exp(-K[0] * dist[i * NUM_FEATURES + 0] * cell_length);
+			feature[6] = 1.0f - exp(-K[6] * min3(dist[i * NUM_FEATURES + 1] * cell_length, dist[i * NUM_FEATURES + 3] * cell_length, dist[i * NUM_FEATURES + 0] * cell_length));
+			feature[7] = 1.0f - exp(-K[7] * dist[i * NUM_FEATURES + 1] * cell_length);
 			
 			score += feature[0] * preference[peopleType][0] * ratioPeople[peopleType]; // 店
 			score += feature[1] * preference[peopleType][1] * ratioPeople[peopleType]; // 学校
