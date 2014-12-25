@@ -20,8 +20,7 @@
 #define BF_CLEARED -1
 #define NUM_FEATURES 5
 #define NUM_PEOPLE_TYPE 10
-
-int bf_count = 0;
+#define NUM_LAYERS 1
 
 struct Point2D {
 	int x;
@@ -217,17 +216,18 @@ void lower(int city_size, std::list<std::pair<int, int> >& queue, int* dist, int
 }
 
 void updateDistanceMap(int city_size, std::list<std::pair<int, int> >& queue, int* zone, int* dist, int* obst, bool* toRaise) {
+	int count = 0;
 	while (!queue.empty()) {
 		std::pair<int, int> s = queue.front();
 		queue.pop_front();
+		printf("%d: s=%d, featureId=%d\n", count, s.first, s.second);
 
 		if (toRaise[s.first * NUM_FEATURES + s.second]) {
 			raise(city_size, queue, dist, obst, toRaise, s.first, s.second);
 		} else if (isOcc(obst, obst[s.first * NUM_FEATURES + s.second], s.second)) {
 			lower(city_size, queue, dist, obst, toRaise, s.first, s.second);
 		}
-
-		bf_count++;
+		count++;
 	}
 }
 
@@ -258,20 +258,20 @@ float computeScore(int city_size, int* zone, int* dist) {
 	int cell_length = 10000 / city_size;
 
 	// 好みベクトル
-	float preference[NUM_PEOPLE_TYPE][8];
+	float preference[10][8];
 	//preference[0][0] = 0; preference[0][1] = 0; preference[0][2] = 0; preference[0][3] = 0; preference[0][4] = 0; preference[0][5] = 0; preference[0][6] = 0; preference[0][7] = 1.0;
-	preference[0][0] = 0; preference[0][1] = 0; preference[0][2] = 0.2; preference[0][3] = 0.2; preference[0][4] = 0.35; preference[0][5] = 0; preference[0][6] = 0.125; preference[0][7] = 0.125;
-	preference[1][0] = 0; preference[1][1] = 0; preference[1][2] = 0.15; preference[1][3] = 0; preference[1][4] = 0.55; preference[1][5] = 0; preference[1][6] = 0.2; preference[1][7] = 0.1;
-	preference[2][0] = 0; preference[2][1] = 0; preference[2][2] = 0.1; preference[2][3] = 0; preference[2][4] = 0; preference[2][5] = 0; preference[2][6] = 0.6; preference[2][7] = 0.3;
-	preference[3][0] = 0.18; preference[3][1] = 0.17; preference[3][2] = 0; preference[3][3] = 0.17; preference[3][4] = 0; preference[3][5] = 0.08; preference[3][6] = 0.2; preference[3][7] = 0.2;
+	preference[0][0] = 0; preference[0][1] = 0; preference[0][2] = 0.2; preference[0][3] = 0.2; preference[0][4] = 0.2; preference[0][5] = 0; preference[0][6] = 0.1; preference[0][7] = 0.3;
+	preference[1][0] = 0; preference[1][1] = 0; preference[1][2] = 0.15; preference[1][3] = 0; preference[1][4] = 0.45; preference[1][5] = 0; preference[1][6] = 0.2; preference[1][7] = 0.2;
+	preference[2][0] = 0; preference[2][1] = 0; preference[2][2] = 0.1; preference[2][3] = 0; preference[2][4] = 0; preference[2][5] = 0; preference[2][6] = 0.4; preference[2][7] = 0.5;
+	preference[3][0] = 0.15; preference[3][1] = 0.13; preference[3][2] = 0; preference[3][3] = 0.14; preference[3][4] = 0; preference[3][5] = 0.08; preference[3][6] = 0.2; preference[3][7] = 0.3;
 	preference[4][0] = 0.3; preference[4][1] = 0; preference[4][2] = 0.3; preference[4][3] = 0.1; preference[4][4] = 0; preference[4][5] = 0; preference[4][6] = 0.1; preference[4][7] = 0.2;
-	preference[5][0] = 0.05; preference[5][1] = 0; preference[5][2] = 0.15; preference[5][3] = 0.3; preference[5][4] = 0.15; preference[5][5] = 0; preference[5][6] = 0.15; preference[5][7] = 0.2;
-	preference[6][0] = 0.2; preference[6][1] = 0.1; preference[6][2] = 0; preference[6][3] = 0.25; preference[6][4] = 0; preference[6][5] = 0.1; preference[6][6] = 0.1; preference[6][7] = 0.25;
+	preference[5][0] = 0.05; preference[5][1] = 0; preference[5][2] = 0.15; preference[5][3] = 0.2; preference[5][4] = 0.15; preference[5][5] = 0; preference[5][6] = 0.15; preference[5][7] = 0.3;
+	preference[6][0] = 0.2; preference[6][1] = 0.1; preference[6][2] = 0; preference[6][3] = 0.2; preference[6][4] = 0; preference[6][5] = 0.1; preference[6][6] = 0.1; preference[6][7] = 0.3;
 	preference[7][0] = 0.3; preference[7][1] = 0; preference[7][2] = 0.3; preference[7][3] = 0; preference[7][4] = 0.2; preference[7][5] = 0; preference[7][6] = 0.1; preference[7][7] = 0.1;
-	preference[8][0] = 0.3; preference[8][1] = 0; preference[8][2] = 0.15; preference[8][3] = 0.05; preference[8][4] = 0; preference[8][5] = 0; preference[8][6] = 0.25; preference[8][7] = 0.25;
-	preference[9][0] = 0.4; preference[9][1] = 0; preference[9][2] = 0.2; preference[9][3] = 0; preference[9][4] = 0; preference[9][5] = 0; preference[9][6] = 0.2; preference[9][7] = 0.2;
+	preference[8][0] = 0.25; preference[8][1] = 0; preference[8][2] = 0.1; preference[8][3] = 0.05; preference[8][4] = 0; preference[8][5] = 0; preference[8][6] = 0.25; preference[8][7] = 0.35;
+	preference[9][0] = 0.25; preference[9][1] = 0; preference[9][2] = 0.2; preference[9][3] = 0; preference[9][4] = 0; preference[9][5] = 0; preference[9][6] = 0.2; preference[9][7] = 0.35;
 
-	const float ratioPeople[NUM_PEOPLE_TYPE] = {1.0f};//, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+	const float ratioPeople[10] = {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 	const float K[] = {0.002f, 0.002f, 0.001f, 0.002f, 0.001f, 0.001f, 0.001f, 0.001f};
 
 	float score = 0.0f;
@@ -395,6 +395,110 @@ void optimize(int city_size, int max_iterations, int* bestZone) {
 	int* zone = (int*)malloc(sizeof(int) * city_size * city_size);
 	int* dist = (int*)malloc(sizeof(int) * city_size * city_size * NUM_FEATURES);
 	int* obst = (int*)malloc(sizeof(int) * city_size * city_size * NUM_FEATURES);
+	bool* toRaise = (bool*)malloc(city_size * city_size);
+
+	memcpy(zone, bestZone, sizeof(int) * city_size * city_size);
+
+	// for backup
+	int* tmpZone = (int*)malloc(sizeof(int) * city_size * city_size);
+	int* tmpDist = (int*)malloc(sizeof(int) * city_size * city_size * NUM_FEATURES);
+	int* tmpObst = (int*)malloc(sizeof(int) * city_size * city_size * NUM_FEATURES);
+
+	// キューのセットアップ
+	std::list<std::pair<int, int> > queue;
+	for (int i = 0; i < city_size * city_size; ++i) {
+		toRaise[i] = false;
+		for (int k = 0; k < NUM_FEATURES; ++k) {
+			if (zone[i] - 1 == k) {
+				setStore(queue, zone, dist, obst, toRaise, i, k);
+			} else {
+				dist[i * NUM_FEATURES + k] = MAX_DIST;
+				obst[i * NUM_FEATURES + k] = BF_CLEARED;
+			}
+		}
+	}
+
+	updateDistanceMap(city_size, queue, zone, dist, obst, toRaise);
+
+	//dumpZone(city_size, zone);
+	//dumpDist(city_size, dist, 4);
+	//check(city_size, zone, dist);
+
+	float curScore = computeScore(city_size, zone, dist);
+	float bestScore = curScore;
+	memcpy(bestZone, zone, sizeof(int) * city_size * city_size);
+
+	float beta = 1.0f;
+	for (int iter = 0; iter < max_iterations; ++iter) {
+		printf("%d\n", iter);
+		queue.clear();
+
+		// バックアップ
+		memcpy(tmpZone, zone, sizeof(int) * city_size * city_size);
+		memcpy(tmpDist, dist, sizeof(int) * city_size * city_size * NUM_FEATURES);
+		memcpy(tmpObst, obst, sizeof(int) * city_size * city_size * NUM_FEATURES);
+
+		// ２つのセルのゾーンタイプを交換
+		int s1, s2;
+		while (true) {
+			s1 = rand() % (city_size * city_size);
+			if (zone[s1] > 0) break;
+		}
+		while (true) {
+			s2 = rand() % (city_size * city_size);
+			if (zone[s2] == 0) break;
+		}
+
+		// move a store
+		int featureId = zone[s1] - 1;
+		zone[s1] = 0;
+		removeStore(queue, zone, dist, obst, toRaise, s1, featureId);
+		zone[s2] = featureId + 1;
+		setStore(queue, zone, dist, obst, toRaise, s2, featureId);
+		updateDistanceMap(city_size, queue, zone, dist, obst, toRaise);
+		
+		//dumpZone(city_size, zone);
+		//dumpDist(city_size, dist, 4);
+		//if (check(city_size, zone, dist) > 0) break;
+
+		float proposedScore = computeScore(city_size, zone, dist);
+
+		// ベストゾーンを更新
+		if (proposedScore > bestScore) {
+			bestScore = proposedScore;
+			memcpy(bestZone, zone, sizeof(int) * city_size * city_size);
+		}
+
+		//printf("%lf -> %lf (best: %lf)\n", curScore, proposedScore, bestScore);
+
+		if (proposedScore > curScore || randf() < proposedScore / curScore) { // accept
+			curScore = proposedScore;
+		} else { // reject
+			// rollback
+			memcpy(zone, tmpZone, sizeof(int) * city_size * city_size);
+			memcpy(dist, tmpDist, sizeof(int) * city_size * city_size * NUM_FEATURES);
+			memcpy(obst, tmpObst, sizeof(int) * city_size * city_size * NUM_FEATURES);
+		}
+	}
+
+	printf("city_size: %d, score: %lf\n", city_size, bestScore);
+
+	char filename[256];
+	sprintf(filename, "zone_%d.png", city_size);
+	showZone(city_size, bestZone, filename);
+	//saveZone(city_size, bestZone);
+}
+
+
+/**
+ * bestZoneに、初期ゾーンプランが入っている。
+ * MCMCを使って、最適なゾーンプランを探し、bestZoneに格納して返却する。
+ * 各ステップでは、隣接セルをランダムに選択し、ゾーンを交換する。
+ */
+void optimize2(int city_size, int max_iterations, int* bestZone) {
+	int* zone = (int*)malloc(sizeof(int) * city_size * city_size);
+	int* dist = (int*)malloc(sizeof(int) * city_size * city_size * NUM_FEATURES);
+	int* obst = (int*)malloc(sizeof(int) * city_size * city_size * NUM_FEATURES);
 	bool* toRaise = (bool*)malloc(city_size * city_size * NUM_FEATURES);
 
 	memcpy(zone, bestZone, sizeof(int) * city_size * city_size);
@@ -428,7 +532,6 @@ void optimize(int city_size, int max_iterations, int* bestZone) {
 	float bestScore = curScore;
 	memcpy(bestZone, zone, sizeof(int) * city_size * city_size);
 
-	bf_count = 0;
 	float beta = 1.0f;
 	int adj[4];
 	adj[0] = -1; adj[1] = 1; adj[2] = -city_size; adj[3] = city_size;
@@ -536,8 +639,13 @@ int main() {
 
 	int max_iterations = 10000;
 
-	for (int layer = 0; layer < 5; ++layer) {
+	for (int layer = 0; layer < NUM_LAYERS; ++layer) {
 		optimize(city_size, max_iterations, zone);
+		/*if (layer == 0) {
+			optimize(city_size, max_iterations, zone);
+		} else {
+			optimize2(city_size, max_iterations, zone);
+		}*/
 		int* tmpZone = (int*)malloc(sizeof(int) * city_size * city_size);
 		memcpy(tmpZone, zone, sizeof(int) * city_size * city_size);
 
@@ -554,7 +662,7 @@ int main() {
 			}
 		}
 
-		max_iterations *= 0.5;
+		max_iterations /= 4;
 
 		free(tmpZone);
 	}

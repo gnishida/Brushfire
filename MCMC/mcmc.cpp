@@ -181,16 +181,16 @@ void raise(std::list<std::pair<int, int> >& queue, int* dist, int* obst, bool* t
 		if (nx < 0 || nx >= CITY_SIZE || ny < 0 || ny >= CITY_SIZE) continue;
 		int n = ny * CITY_SIZE + nx;
 
-		if (obst[n * NUM_FEATURES + featureId] != BF_CLEARED && !toRaise[n]) {
+		if (obst[n * NUM_FEATURES + featureId] != BF_CLEARED && !toRaise[n * NUM_FEATURES + featureId]) {
 			if (!isOcc(obst, obst[n * NUM_FEATURES + featureId], featureId)) {
 				clearCell(dist, obst, n, featureId);
-				toRaise[n] = true;
+				toRaise[n * NUM_FEATURES + featureId] = true;
 			}
 			queue.push_back(std::make_pair(n, featureId));
 		}
 	}
 
-	toRaise[s] = false;
+	toRaise[s * NUM_FEATURES + featureId] = false;
 }
 
 void lower(std::list<std::pair<int, int> >& queue, int* dist, int* obst, bool* toRaise, int s, int featureId) {
@@ -206,7 +206,7 @@ void lower(std::list<std::pair<int, int> >& queue, int* dist, int* obst, bool* t
 		if (nx < 0 || nx >= CITY_SIZE || ny < 0 || ny >= CITY_SIZE) continue;
 		int n = ny * CITY_SIZE + nx;
 
-		if (!toRaise[n]) {
+		if (!toRaise[n * NUM_FEATURES + featureId]) {
 			int d = distance(obst[s * NUM_FEATURES + featureId], n);
 			if (d < dist[n * NUM_FEATURES + featureId]) {
 				dist[n * NUM_FEATURES + featureId] = d;
@@ -222,7 +222,7 @@ void updateDistanceMap(std::list<std::pair<int, int> >& queue, int* zone, int* d
 		std::pair<int, int> s = queue.front();
 		queue.pop_front();
 
-		if (toRaise[s.first]) {
+		if (toRaise[s.first * NUM_FEATURES + s.second]) {
 			raise(queue, dist, obst, toRaise, s.first, s.second);
 		} else if (isOcc(obst, obst[s.first * NUM_FEATURES + s.second], s.second)) {
 			lower(queue, dist, obst, toRaise, s.first, s.second);
@@ -243,7 +243,7 @@ void setStore(std::list<std::pair<int, int> >& queue, int* zone, int* dist, int*
 void removeStore(std::list<std::pair<int, int> >& queue, int* zone, int* dist, int* obst, bool* toRaise, int s, int featureId) {
 	clearCell(dist, obst, s, featureId);
 
-	toRaise[s] = true;
+	toRaise[s * NUM_FEATURES + featureId] = true;
 
 	queue.push_back(std::make_pair(s, featureId));
 }
@@ -257,22 +257,20 @@ float min3(float distToStore, float distToAmusement, float distToFactory) {
  */
 float computeScore(int* zone, int* dist) {
 	// 好みベクトル
-	float preference[NUM_PEOPLE_TYPE][8];
-	preference[0][0] = 0; preference[0][1] = 0; preference[0][2] = 0; preference[0][3] = 0; preference[0][4] = 0; preference[0][5] = 0; preference[0][6] = 0; preference[0][7] = 1.0;
-	/*
-	preference[0][0] = 0; preference[0][1] = 0; preference[0][2] = 0.15; preference[0][3] = 0.15; preference[0][4] = 0.3; preference[0][5] = 0; preference[0][6] = 0.1; preference[0][7] = 0.1; preference[0][8] = 0.2;
-	preference[1][0] = 0; preference[1][1] = 0; preference[1][2] = 0.15; preference[1][3] = 0; preference[1][4] = 0.55; preference[1][5] = 0; preference[1][6] = 0.2; preference[1][7] = 0.1; preference[1][8] = 0;
-	preference[2][0] = 0; preference[2][1] = 0; preference[2][2] = 0.05; preference[2][3] = 0; preference[2][4] = 0; preference[2][5] = 0; preference[2][6] = 0.25; preference[2][7] = 0.1; preference[2][8] = 0.6;
-	preference[3][0] = 0.18; preference[3][1] = 0.17; preference[3][2] = 0; preference[3][3] = 0.17; preference[3][4] = 0; preference[3][5] = 0.08; preference[3][6] = 0.2; preference[3][7] = 0.2; preference[3][8] = 0;
-	preference[4][0] = 0.3; preference[4][1] = 0; preference[4][2] = 0.3; preference[4][3] = 0.1; preference[4][4] = 0; preference[4][5] = 0; preference[4][6] = 0.1; preference[4][7] = 0.2; preference[4][8] = 0;
-	preference[5][0] = 0.05; preference[5][1] = 0; preference[5][2] = 0.1; preference[5][3] = 0.2; preference[5][4] = 0.1; preference[5][5] = 0; preference[5][6] = 0.1; preference[5][7] = 0.15; preference[5][8] = 0.3;
-	preference[6][0] = 0.15; preference[6][1] = 0.1; preference[6][2] = 0; preference[6][3] = 0.15; preference[6][4] = 0; preference[6][5] = 0.1; preference[6][6] = 0.1; preference[6][7] = 0.2; preference[6][8] = 0.2;
-	preference[7][0] = 0.2; preference[7][1] = 0; preference[7][2] = 0.25; preference[7][3] = 0; preference[7][4] = 0.15; preference[7][5] = 0; preference[7][6] = 0.1; preference[7][7] = 0.1; preference[7][8] = 0.2;
-	preference[8][0] = 0.3; preference[8][1] = 0; preference[8][2] = 0.15; preference[8][3] = 0.05; preference[8][4] = 0; preference[8][5] = 0; preference[8][6] = 0.25; preference[8][7] = 0.25; preference[8][8] = 0;
-	preference[9][0] = 0.4; preference[9][1] = 0; preference[9][2] = 0.2; preference[9][3] = 0; preference[9][4] = 0; preference[9][5] = 0; preference[9][6] = 0.2; preference[9][7] = 0.2; preference[9][8] = 0;
-	*/
+	float preference[10][8];
+	//preference[0][0] = 0; preference[0][1] = 0; preference[0][2] = 0; preference[0][3] = 0; preference[0][4] = 0; preference[0][5] = 0; preference[0][6] = 0; preference[0][7] = 1.0;
+	preference[0][0] = 0; preference[0][1] = 0; preference[0][2] = 0.2; preference[0][3] = 0.2; preference[0][4] = 0.2; preference[0][5] = 0; preference[0][6] = 0.1; preference[0][7] = 0.3;
+	preference[1][0] = 0; preference[1][1] = 0; preference[1][2] = 0.15; preference[1][3] = 0; preference[1][4] = 0.45; preference[1][5] = 0; preference[1][6] = 0.2; preference[1][7] = 0.2;
+	preference[2][0] = 0; preference[2][1] = 0; preference[2][2] = 0.1; preference[2][3] = 0; preference[2][4] = 0; preference[2][5] = 0; preference[2][6] = 0.4; preference[2][7] = 0.5;
+	preference[3][0] = 0.15; preference[3][1] = 0.13; preference[3][2] = 0; preference[3][3] = 0.14; preference[3][4] = 0; preference[3][5] = 0.08; preference[3][6] = 0.2; preference[3][7] = 0.3;
+	preference[4][0] = 0.3; preference[4][1] = 0; preference[4][2] = 0.3; preference[4][3] = 0.1; preference[4][4] = 0; preference[4][5] = 0; preference[4][6] = 0.1; preference[4][7] = 0.2;
+	preference[5][0] = 0.05; preference[5][1] = 0; preference[5][2] = 0.15; preference[5][3] = 0.2; preference[5][4] = 0.15; preference[5][5] = 0; preference[5][6] = 0.15; preference[5][7] = 0.3;
+	preference[6][0] = 0.2; preference[6][1] = 0.1; preference[6][2] = 0; preference[6][3] = 0.2; preference[6][4] = 0; preference[6][5] = 0.1; preference[6][6] = 0.1; preference[6][7] = 0.3;
+	preference[7][0] = 0.3; preference[7][1] = 0; preference[7][2] = 0.3; preference[7][3] = 0; preference[7][4] = 0.2; preference[7][5] = 0; preference[7][6] = 0.1; preference[7][7] = 0.1;
+	preference[8][0] = 0.25; preference[8][1] = 0; preference[8][2] = 0.1; preference[8][3] = 0.05; preference[8][4] = 0; preference[8][5] = 0; preference[8][6] = 0.25; preference[8][7] = 0.35;
+	preference[9][0] = 0.25; preference[9][1] = 0; preference[9][2] = 0.2; preference[9][3] = 0; preference[9][4] = 0; preference[9][5] = 0; preference[9][6] = 0.2; preference[9][7] = 0.35;
 
-	const float ratioPeople[NUM_PEOPLE_TYPE] = {1.0f};//, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+	const float ratioPeople[10] = {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 	const float K[] = {0.002f, 0.002f, 0.001f, 0.002f, 0.001f, 0.001f, 0.001f, 0.001f};
 
 	float score = 0.0f;
@@ -391,16 +389,16 @@ void generateZoningPlan(int* zone, std::vector<float> zoneTypeDistribution) {
 int main() {
 	time_t start, end;
 
-	int* zone;
-	zone = (int*)malloc(sizeof(int) * CITY_SIZE * CITY_SIZE);
-	int* dist;
-	dist = (int*)malloc(sizeof(int) * CITY_SIZE * CITY_SIZE * NUM_FEATURES);
-	int* obst;
-	obst = (int*)malloc(sizeof(int) * CITY_SIZE * CITY_SIZE * NUM_FEATURES);
-	bool* toRaise;
-	toRaise = (bool*)malloc(CITY_SIZE * CITY_SIZE);
-	int* bestZone;
-	bestZone = (int*)malloc(sizeof(int) * CITY_SIZE * CITY_SIZE);
+	int* zone = (int*)malloc(sizeof(int) * CITY_SIZE * CITY_SIZE);
+	int* dist = (int*)malloc(sizeof(int) * CITY_SIZE * CITY_SIZE * NUM_FEATURES);
+	int* obst = (int*)malloc(sizeof(int) * CITY_SIZE * CITY_SIZE * NUM_FEATURES);
+	bool* toRaise = (bool*)malloc(CITY_SIZE * CITY_SIZE * NUM_FEATURES);
+	int* bestZone = (int*)malloc(sizeof(int) * CITY_SIZE * CITY_SIZE);
+
+	// for backup
+	int* tmpZone = (int*)malloc(sizeof(int) * CITY_SIZE * CITY_SIZE);
+	int* tmpDist = (int*)malloc(sizeof(int) * CITY_SIZE * CITY_SIZE * NUM_FEATURES);
+	int* tmpObst = (int*)malloc(sizeof(int) * CITY_SIZE * CITY_SIZE * NUM_FEATURES);
 	
 	// initialize the zone
 	std::vector<float> zoneTypeDistribution(6);
@@ -421,8 +419,8 @@ int main() {
 	// キューのセットアップ
 	std::list<std::pair<int, int> > queue;
 	for (int i = 0; i < CITY_SIZE * CITY_SIZE; ++i) {
-		toRaise[i] = false;
 		for (int k = 0; k < NUM_FEATURES; ++k) {
+			toRaise[i * NUM_FEATURES + k] = false;
 			if (zone[i] - 1 == k) {
 				setStore(queue, zone, dist, obst, toRaise, i, k);
 			} else {
@@ -446,6 +444,11 @@ int main() {
 	float beta = 1.0f;
 	for (int iter = 0; iter < MAX_ITERATIONS; ++iter) {
 		queue.clear();
+
+		// バックアップ
+		memcpy(tmpZone, zone, sizeof(int) * CITY_SIZE * CITY_SIZE);
+		memcpy(tmpDist, dist, sizeof(int) * CITY_SIZE * CITY_SIZE * NUM_FEATURES);
+		memcpy(tmpObst, obst, sizeof(int) * CITY_SIZE * CITY_SIZE * NUM_FEATURES);
 
 		// ２つのセルのゾーンタイプを交換
 		int s1;
@@ -486,13 +489,9 @@ int main() {
 			curScore = proposedScore;
 		} else { // reject
 			// rollback
-			queue.clear();
-
-			zone[s2] = 0;
-			removeStore(queue, zone, dist, obst, toRaise, s2, featureId);
-			zone[s1] = featureId + 1;
-			setStore(queue, zone, dist, obst, toRaise, s1, featureId);
-			updateDistanceMap(queue, zone, dist, obst, toRaise);
+			memcpy(zone, tmpZone, sizeof(int) * CITY_SIZE * CITY_SIZE);
+			memcpy(dist, tmpDist, sizeof(int) * CITY_SIZE * CITY_SIZE * NUM_FEATURES);
+			memcpy(obst, tmpObst, sizeof(int) * CITY_SIZE * CITY_SIZE * NUM_FEATURES);
 		}
 	}
 
