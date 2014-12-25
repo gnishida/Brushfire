@@ -1,6 +1,7 @@
 ﻿#include "MCMC.h"
 
 void MCMC::findBestPlan(int** zone, int* city_size) {
+	srand(10);
 	*city_size = 5;
 
 	*zone = (int*)malloc(sizeof(int) * (*city_size) * (*city_size));
