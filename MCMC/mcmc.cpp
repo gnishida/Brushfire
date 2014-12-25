@@ -14,8 +14,8 @@
 #include <opencv/cv.h>
 #include <opencv/highgui.h>
 
-#define CELL_LENGTH 100 // 20
-#define CITY_SIZE 40 // 200
+#define CELL_LENGTH 4000 // 20
+#define CITY_SIZE 5 // 200
 #define MAX_DIST 99
 #define BF_CLEARED -1
 #define MAX_ITERATIONS 10000 //1000
@@ -103,15 +103,51 @@ void showZone(int* zone) {
 		for (int c = 0; c < CITY_SIZE; ++c) {
 			cv::Vec3b p;
 			if (zone[r * CITY_SIZE + c] == 0) {
+				p = cv::Vec3b(0, 0, 255);
+			} else if (zone[r * CITY_SIZE + c] == 1) {
 				p = cv::Vec3b(255, 0, 0);
+			} else if (zone[r * CITY_SIZE + c] == 2) {
+				p = cv::Vec3b(64, 64, 64);
+			} else if (zone[r * CITY_SIZE + c] == 3) {
+				p = cv::Vec3b(0, 255, 0);
+			} else if (zone[r * CITY_SIZE + c] == 4) {
+				p = cv::Vec3b(255, 0, 255);
+			} else if (zone[r * CITY_SIZE + c] == 5) {
+				p = cv::Vec3b(0, 255, 255);
 			} else {
-				p = cv::Vec3b(0, 0, 0);
+				p = cv::Vec3b(255, 255, 255);
 			}
 			m.at<cv::Vec3b>(r, c) = p;
 		}
 	}
 
 	cv::imwrite("zone.png", m);
+}
+
+void loadZone(int* zone, char* filename) {
+	FILE* fp = fopen(filename, "r");
+
+	for (int r = 0; r < CITY_SIZE; ++r) {
+		for (int c = 0; c < CITY_SIZE; ++c) {
+			fscanf(fp, "%d,", &zone[r * CITY_SIZE + c]);
+		}
+	}
+
+	fclose(fp);
+}
+
+void saveZone(int* zone) {
+	FILE* fp = fopen("zone.txt", "w");
+
+	for (int r = 0; r < CITY_SIZE; ++r) {
+		for (int c = 0; c < CITY_SIZE; ++c) {
+			fprintf(fp, "%d,", zone[r * CITY_SIZE + c]);
+		}
+		fprintf(fp, "\n");
+	}
+	fprintf(fp, "\n");
+
+	fclose(fp);
 }
 
 inline bool isOcc(int* obst, int s, int featureId) {
@@ -241,8 +277,11 @@ float computeScore(int* zone, int* dist) {
 
 	float score = 0.0f;
 
+	int num_zones = 0;
 	for (int i = 0; i < CITY_SIZE * CITY_SIZE; ++i) {
 		if (zone[i] == 0) continue;
+
+		num_zones++;
 
 		for (int peopleType = 0; peopleType < NUM_PEOPLE_TYPE; ++peopleType) {
 			float feature[8];
@@ -266,7 +305,7 @@ float computeScore(int* zone, int* dist) {
 		}
 	}
 
-	return score;
+	return score / num_zones;
 }
 
 /**
@@ -323,6 +362,30 @@ void generateZoningPlan(int* zone, std::vector<float> zoneTypeDistribution) {
 			numRemainings[type] -= 1;
 		}
 	}
+
+	return;
+
+	// デバッグ用
+	// 工場を一番上に持っていく
+	// そうすれば、良いゾーンプランになるはず。。。
+	for (int r = 2; r < CITY_SIZE; ++r) {
+		for (int c = 0; c < CITY_SIZE; ++c) {
+			if (zone[r * CITY_SIZE + c] != 2) continue;
+
+			bool done = false;
+			for (int r2 = 0; r2 < 2 && !done; ++r2) {
+				for (int c2 = 0; c2 < CITY_SIZE && !done; ++c2) {
+					if (zone[r2 * CITY_SIZE + c2] == 2) continue;
+
+					// 交換する
+					int type = zone[r2 * CITY_SIZE + c2];
+					zone[r2 * CITY_SIZE + c2] = zone[r * CITY_SIZE + c];
+					zone[r * CITY_SIZE + c] = type;
+					done = true;
+				}
+			}
+		}
+	}
 }
 
 int main() {
@@ -336,6 +399,8 @@ int main() {
 	obst = (int*)malloc(sizeof(int) * CITY_SIZE * CITY_SIZE * NUM_FEATURES);
 	bool* toRaise;
 	toRaise = (bool*)malloc(CITY_SIZE * CITY_SIZE);
+	int* bestZone;
+	bestZone = (int*)malloc(sizeof(int) * CITY_SIZE * CITY_SIZE);
 	
 	// initialize the zone
 	std::vector<float> zoneTypeDistribution(6);
@@ -349,6 +414,7 @@ int main() {
 	// 初期プランを生成
 	start = clock();
 	generateZoningPlan(zone, zoneTypeDistribution);
+	//loadZone(zone, "zone2.txt");
 	end = clock();
 	printf("generateZoningPlan: %lf\n", (double)(end-start)/CLOCKS_PER_SEC);
 
@@ -373,8 +439,11 @@ int main() {
 	//check(zone, dist);
 
 	float curScore = computeScore(zone, dist);
-	
+	float bestScore = curScore;
+	memcpy(bestZone, zone, sizeof(int) * CITY_SIZE * CITY_SIZE);
+
 	bf_count = 0;
+	float beta = 1.0f;
 	for (int iter = 0; iter < MAX_ITERATIONS; ++iter) {
 		queue.clear();
 
@@ -405,10 +474,16 @@ int main() {
 
 		float proposedScore = computeScore(zone, dist);
 
+		// ベストゾーンを更新
+		if (proposedScore > bestScore) {
+			bestScore = proposedScore;
+			memcpy(bestZone, zone, sizeof(int) * CITY_SIZE * CITY_SIZE);
+		}
 
-		if (proposedScore > curScore) { // accept
+		//printf("%lf -> %lf (best: %lf)\n", curScore, proposedScore, bestScore);
+
+		if (proposedScore > curScore || randf() < proposedScore / curScore) { // accept
 			curScore = proposedScore;
-			printf("%lf\n", curScore);
 		} else { // reject
 			// rollback
 			queue.clear();
@@ -421,11 +496,10 @@ int main() {
 		}
 	}
 
-	dumpZone(zone);
-	dumpDist(dist, 1);
-	check(zone, dist);
+	printf("score: %lf\n", bestScore);
 
-	showZone(zone);
+	showZone(bestZone);
+	saveZone(bestZone);
 
 	printf("avg bf_count = %d\n", bf_count / MAX_ITERATIONS);
 	printf("total bf_count = %d\n", bf_count);
