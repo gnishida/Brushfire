@@ -216,18 +216,15 @@ void lower(int city_size, std::list<std::pair<int, int> >& queue, int* dist, int
 }
 
 void updateDistanceMap(int city_size, std::list<std::pair<int, int> >& queue, int* zone, int* dist, int* obst, bool* toRaise) {
-	int count = 0;
 	while (!queue.empty()) {
 		std::pair<int, int> s = queue.front();
 		queue.pop_front();
-		printf("%d: s=%d, featureId=%d\n", count, s.first, s.second);
 
 		if (toRaise[s.first * NUM_FEATURES + s.second]) {
 			raise(city_size, queue, dist, obst, toRaise, s.first, s.second);
 		} else if (isOcc(obst, obst[s.first * NUM_FEATURES + s.second], s.second)) {
 			lower(city_size, queue, dist, obst, toRaise, s.first, s.second);
 		}
-		count++;
 	}
 }
 
@@ -407,8 +404,8 @@ void optimize(int city_size, int max_iterations, int* bestZone) {
 	// キューのセットアップ
 	std::list<std::pair<int, int> > queue;
 	for (int i = 0; i < city_size * city_size; ++i) {
-		toRaise[i] = false;
 		for (int k = 0; k < NUM_FEATURES; ++k) {
+			toRaise[i * NUM_FEATURES + k] = false;
 			if (zone[i] - 1 == k) {
 				setStore(queue, zone, dist, obst, toRaise, i, k);
 			} else {
@@ -662,7 +659,7 @@ int main() {
 			}
 		}
 
-		max_iterations /= 4;
+		max_iterations *= 0.5;
 
 		free(tmpZone);
 	}

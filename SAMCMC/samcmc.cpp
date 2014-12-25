@@ -20,8 +20,6 @@
 #define NUM_PEOPLE_TYPE 10
 #define NUM_LAYERS 1
 
-int bf_count = 0;
-
 struct Point2D {
 	int x;
 	int y;
@@ -225,8 +223,6 @@ void updateDistanceMap(int city_size, std::list<std::pair<int, int> >& queue, in
 		} else if (isOcc(obst, obst[s.first * NUM_FEATURES + s.second], s.second)) {
 			lower(city_size, queue, dist, obst, toRaise, s.first, s.second);
 		}
-
-		bf_count++;
 	}
 }
 
@@ -270,7 +266,7 @@ float computeScore(int city_size, int* zone, int* dist) {
 	preference[8][0] = 0.25; preference[8][1] = 0; preference[8][2] = 0.1; preference[8][3] = 0.05; preference[8][4] = 0; preference[8][5] = 0; preference[8][6] = 0.25; preference[8][7] = 0.35;
 	preference[9][0] = 0.25; preference[9][1] = 0; preference[9][2] = 0.2; preference[9][3] = 0; preference[9][4] = 0; preference[9][5] = 0; preference[9][6] = 0.2; preference[9][7] = 0.35;
 
-	const float ratioPeople[10] = {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+	const float ratioPeople[10] = {0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1};
 	const float K[] = {0.002f, 0.002f, 0.001f, 0.002f, 0.001f, 0.001f, 0.001f, 0.001f};
 
 	float score = 0.0f;
@@ -406,8 +402,8 @@ void optimize(int city_size, int max_iterations, int* bestZone) {
 	// キューのセットアップ
 	std::list<std::pair<int, int> > queue;
 	for (int i = 0; i < city_size * city_size; ++i) {
-		toRaise[i] = false;
 		for (int k = 0; k < NUM_FEATURES; ++k) {
+			toRaise[i * NUM_FEATURES + k] = false;
 			if (zone[i] - 1 == k) {
 				setStore(queue, zone, dist, obst, toRaise, i, k);
 			} else {
