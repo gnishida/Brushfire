@@ -14,7 +14,7 @@
 #include <opencv/cv.h>
 #include <opencv/highgui.h>
 
-#define cell_length 4000 // 20
+#define cell_length 2000 // 20
 #define CITY_SIZE 5 // 200
 #define MAX_DIST 99
 #define BF_CLEARED -1

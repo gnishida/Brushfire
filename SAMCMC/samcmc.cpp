@@ -95,7 +95,7 @@ void dumpDist(int city_size, int* dist, int featureId) {
 	printf("\n");
 }
 
-void showZone(int city_size, int* zone) {
+void showZone(int city_size, int* zone, char* filename) {
 	cv::Mat m(city_size, city_size, CV_8UC3);
 	for (int r = 0; r < city_size; ++r) {
 		for (int c = 0; c < city_size; ++c) {
@@ -119,7 +119,7 @@ void showZone(int city_size, int* zone) {
 		}
 	}
 
-	cv::imwrite("zone.png", m);
+	cv::imwrite(filename, m);
 }
 
 void loadZone(int city_size, int* zone, char* filename) {
@@ -134,8 +134,8 @@ void loadZone(int city_size, int* zone, char* filename) {
 	fclose(fp);
 }
 
-void saveZone(int city_size, int* zone) {
-	FILE* fp = fopen("zone.txt", "w");
+void saveZone(int city_size, int* zone, char* filename) {
+	FILE* fp = fopen(filename, "w");
 
 	for (int r = 0; r < city_size; ++r) {
 		for (int c = 0; c < city_size; ++c) {
@@ -484,7 +484,9 @@ void optimize(int city_size, int* bestZone) {
 
 	printf("city_size: %d, score: %lf\n", city_size, bestScore);
 
-	//showZone(city_size, bestZone);
+	char filename[256];
+	sprintf(filename, "zone_%d.png", city_size);
+	showZone(city_size, bestZone, filename);
 	//saveZone(city_size, bestZone);
 }
 
@@ -495,14 +497,6 @@ int main() {
 
 	int* zone;
 	zone = (int*)malloc(sizeof(int) * city_size * city_size);
-	int* dist;
-	dist = (int*)malloc(sizeof(int) * city_size * city_size * NUM_FEATURES);
-	int* obst;
-	obst = (int*)malloc(sizeof(int) * city_size * city_size * NUM_FEATURES);
-	bool* toRaise;
-	toRaise = (bool*)malloc(city_size * city_size);
-	int* bestZone;
-	bestZone = (int*)malloc(sizeof(int) * city_size * city_size);
 	
 	// initialize the zone
 	std::vector<float> zoneTypeDistribution(6);
@@ -520,7 +514,7 @@ int main() {
 	end = clock();
 	printf("generateZoningPlan: %lf\n", (double)(end-start)/CLOCKS_PER_SEC);
 
-	for (int layer = 0; layer < 3; ++layer) {
+	for (int layer = 0; layer < 5; ++layer) {
 		optimize(city_size, zone);
 		int* tmpZone = (int*)malloc(sizeof(int) * city_size * city_size);
 		memcpy(tmpZone, zone, sizeof(int) * city_size * city_size);
@@ -537,10 +531,14 @@ int main() {
 				zone[r * city_size + c] = tmpZone[(int)(oldR * city_size * 0.5 + oldC)];
 			}
 		}
+
+		free(tmpZone);
 	}
 	
-	showZone(city_size, zone);
-	saveZone(city_size, zone);
+	showZone(city_size, zone, "zone_final.png");
+	saveZone(city_size, zone, "zone_final.txt");
+
+	free(zone);
 
 	return 0;
 }
